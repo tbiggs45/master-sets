@@ -17,7 +17,7 @@ private enum ScanBackend {
     // TODO: Replace with your deployed Render/Railway/Fly URL after deployment.
     // Example: "https://master-sets-scan.onrender.com"
     // Leave empty ("") during local development and use the settings UI to set a dev URL.
-    static let defaultEndpoint = ""
+    static let defaultEndpoint = "https://master-sets.onrender.com"
 }
 
 // MARK: - Scan Settings
