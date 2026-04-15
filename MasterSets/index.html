@@ -1326,8 +1326,7 @@
 
       function handleCapture() {
         if (!videoRef.current || !cameraReady || identifyingRef.current) return;
-        if (stabilityIntervalRef.current) { clearInterval(stabilityIntervalRef.current); stabilityIntervalRef.current = null; }
-        try { freezeAndIdentify(captureFrame(videoRef.current)); } catch {}
+        try { freezeAndIdentify(captureFrame(videoRef.current)); } catch (e) { console.error("Capture error:", e); }
       }
 
       function handleFileUpload(e) {
