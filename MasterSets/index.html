@@ -673,14 +673,19 @@
     async function identifyCardWithVision(base64) {
       const backendURL = (window.POKEBINDER_SCAN_ENDPOINT || "").trim();
       if (backendURL) {
+        const TIMEOUT_MS = 30000;
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 55000);
+        const abortTimer = setTimeout(() => controller.abort(), TIMEOUT_MS);
         try {
-          const response = await fetch(`${backendURL.replace(/\/$/, "")}/identify-card`, {
+          const fetchPromise = fetch(`${backendURL.replace(/\/$/, "")}/identify-card`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ imageBase64: base64 }),
             signal: controller.signal,
           });
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("TIMEOUT")), TIMEOUT_MS)
+          );
+          const response = await Promise.race([fetchPromise, timeoutPromise]);
           if (!response.ok) {
             if (response.status === 429) throw new Error("RATE_LIMITED");
             const errData = await response.json().catch(() => ({}));
@@ -688,10 +693,10 @@
           }
           return response.json();
         } catch (e) {
-          if (e.name === "AbortError") throw new Error("TIMEOUT");
+          if (e.name === "AbortError" || e.message === "TIMEOUT") throw new Error("TIMEOUT");
           throw e;
         } finally {
-          clearTimeout(timer);
+          clearTimeout(abortTimer);
         }
       }
       const apiKey = window.ANTHROPIC_API_KEY || "";
@@ -1278,7 +1283,19 @@
       async function doIdentify(base64) {
         if (identifyingRef.current) return;
         identifyingRef.current = true;
-        setIdentifying(true); setIdentifyError(null); setStabilityProgress(0);
+        setIdentifying(true); setIdentifyError(null);
+
+        // Safety-net: force reset UI if nothing resolves within 35 s
+        const safetyTimer = setTimeout(() => {
+          if (!mountedRef.current) return;
+          identifyingRef.current = false;
+          setIdentifying(false);
+          setCapturedFrame(null);
+          const msg = "Analysis timed out — please try again";
+          setIdentifyError(msg); showToast(msg, "error");
+          startCamera();
+        }, 35000);
+
         try {
           const visionResult = await identifyCardWithVision(base64);
           if (mountedRef.current) navigate("confirm", { visionResult, capturedBase64: base64 });
@@ -1286,13 +1303,14 @@
           if (!mountedRef.current) return;
           const msg = e.message.includes("NO_SCAN_BACKEND") ? "Card scanning is coming soon — stay tuned!"
             : e.message.includes("RATE_LIMITED") ? "Too many scans — try again in a moment"
-            : e.message.includes("TIMEOUT") ? "Server is waking up — this can take ~30 s on first use. Try again."
+            : e.message.includes("TIMEOUT") ? "Analysis timed out — please try again"
             : e.message.includes("401") || e.message.includes("403") ? "Scan service unavailable — try again later"
             : "Couldn't identify card — try better lighting or a clearer angle";
           setIdentifyError(msg); showToast(msg, "error");
           setCapturedFrame(null);
           startCamera();
         } finally {
+          clearTimeout(safetyTimer);
           identifyingRef.current = false;
           if (mountedRef.current) setIdentifying(false);
         }
