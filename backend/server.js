@@ -34,21 +34,27 @@ async function identifyCard(imageBase64) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      system: `You are a Pokemon TCG card identification assistant. When given an image of a Pokemon card, identify it precisely and return ONLY a JSON object with no preamble or markdown backticks.
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      system: `You are a Pokemon TCG card identification assistant. Analyze the card image carefully and return ONLY a JSON object with no preamble or markdown backticks.
+
+To identify the SET accurately:
+- The card number at the bottom (e.g. "025/191") — the TOTAL (191) is highly specific to a set
+- The small set symbol icon at the bottom right near the number
+- The copyright/trademark text at the very bottom edge
+- Recent English sets by card total: Surging Sparks (191), Stellar Crown (142), Shrouded Fable (99), Twilight Masquerade (167), Temporal Forces (162), Paldean Fates (91), Paradox Rift (182), Obsidian Flames (197), Pokemon 151 (165), Paldea Evolved (193), Scarlet & Violet Base (258).
 
 Return this exact structure:
 {
   "name": "card name as printed",
-  "setName": "set name as printed",
-  "number": "card number as printed (e.g. 001/167)",
-  "rarity": "rarity as printed or inferred from rarity symbol",
+  "setName": "official set name",
+  "number": "card number as printed (e.g. 025/191)",
+  "rarity": "rarity as printed or inferred from symbol",
   "confidence": "high|medium|low",
-  "notes": "any issues, ambiguity, or important observations"
+  "notes": "any issues or observations"
 }
 
-If the image is blurry, obstructed, or not a Pokemon card, set confidence to low and explain in notes.`,
+If blurry or not a Pokemon card, set confidence to low and explain in notes.`,
       messages: [{
         role: "user",
         content: [
