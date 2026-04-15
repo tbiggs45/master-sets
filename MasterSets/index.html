@@ -1425,6 +1425,7 @@
     // ── ConfirmScreen ─────────────────────────────────────────────────────────
     function ConfirmScreen({ visionResult, capturedBase64, navigate, goBack }) {
       const [tcgCard, setTcgCard] = useState(null);
+      const [allVersions, setAllVersions] = useState([]);
       const [loadingCard, setLoadingCard] = useState(true);
       const [fetchError, setFetchError] = useState(null);
       const [collection, setCollection] = useState(null);
@@ -1432,8 +1433,6 @@
       const [saveSuccess, setSaveSuccess] = useState(false);
       const [toast, setToast] = useState(null);
       const [name, setName] = useState(visionResult?.name ?? "");
-      const [cardSetName, setCardSetName] = useState(visionResult?.setName ?? "");
-      const [number, setNumber] = useState(visionResult?.number ?? "");
       const showToast = (message, type = "info") => setToast({ message, type });
 
       useEffect(() => {
@@ -1442,28 +1441,35 @@
           const col = await loadCollection();
           if (!mounted) return;
           setCollection(col);
-          await lookupCard(visionResult?.name, visionResult?.setName, visionResult?.number);
+          await lookupCard(visionResult?.name, visionResult?.number);
         }
         init();
         return () => { mounted = false; };
       }, []);
 
-      async function lookupCard(cardName, sName, cardNumber) {
-        setLoadingCard(true); setFetchError(null);
+      async function lookupCard(cardName, cardNumber) {
+        setLoadingCard(true); setFetchError(null); setAllVersions([]);
         try {
-          // Try English (pokemontcg.io) first
-          let card = await fetchCardByNameAndSet(cardName, sName, cardNumber);
-          // Fall back to non-English (TCGdex) if not found
-          if (!card) card = await fetchTcgdexCardByNameAndSet(cardName, sName, cardNumber);
-          setTcgCard(card);
-          if (!card) setFetchError("Card not found — try editing the name or set below and searching again");
+          const cards = await searchCardsByName(cardName);
+          if (!cards.length) {
+            setFetchError("No cards found — try editing the name below");
+            setTcgCard(null);
+            return;
+          }
+          setAllVersions(cards);
+          // Pre-select best match by number, otherwise first result
+          const numOnly = (cardNumber || "").split("/")[0].replace(/^0+/, "");
+          const best = numOnly
+            ? cards.find(c => c.number.replace(/^0+/, "") === numOnly) ?? cards[0]
+            : cards[0];
+          setTcgCard(best);
         } catch (e) {
           if (e.message === "RATE_LIMITED") { setFetchError("Rate limited — try again in a moment"); showToast("Too many requests — try again in a moment", "warning"); }
           else setFetchError("Could not fetch card data");
         } finally { setLoadingCard(false); }
       }
 
-      function handleRetryLookup() { lookupCard(name, cardSetName, number.split("/")[0]); }
+      function handleRetryLookup() { lookupCard(name, ""); }
 
       const marketPrice = extractPrice(tcgCard);
       const existingCard = collection?.cards?.[tcgCard?.id];
@@ -1540,6 +1546,40 @@
 
             {loadingCard && <div style={{ marginBottom: 20 }}><LoadingSpinner label="Looking up card…" /></div>}
 
+            {/* Version picker */}
+            {allVersions.length > 1 && !loadingCard && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 10, color: "#A1A1A1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 10 }}>
+                  {allVersions.length} versions — tap the one you have
+                </div>
+                <div style={{ overflowX: "auto", display: "flex", gap: 10, paddingBottom: 4, scrollSnapType: "x mandatory" }}>
+                  {allVersions.map(card => {
+                    const isSelected = tcgCard?.id === card.id;
+                    return (
+                      <div key={card.id} onClick={() => setTcgCard(card)} style={{
+                        flexShrink: 0, scrollSnapAlign: "start", cursor: "pointer",
+                        position: "relative", borderRadius: 10,
+                        outline: isSelected ? "2px solid #00C4BC" : "2px solid transparent",
+                        outlineOffset: 2, transition: "outline-color 0.15s",
+                      }}>
+                        <img src={card.images?.small} alt={card.name} loading="lazy"
+                          onError={e => { e.currentTarget.onerror = null; e.currentTarget.style.opacity = "0.3"; }}
+                          style={{ width: 80, borderRadius: 8, display: "block" }} />
+                        <div style={{ fontSize: 9, color: isSelected ? "#00C4BC" : "#6B7280", textAlign: "center", marginTop: 4, fontWeight: 700, maxWidth: 80, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                          {card.set?.name}
+                        </div>
+                        {isSelected && (
+                          <div style={{ position: "absolute", top: 4, right: 4, background: "#00C4BC", borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <MatIcon name="check" size={11} color="#fff" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {visionResult?.confidence && <div style={{ marginBottom: 16 }}><ConfidenceBadge confidence={visionResult.confidence} /></div>}
 
             {isDuplicate && (
@@ -1562,29 +1602,17 @@
               </div>
             )}
 
-            {/* Editable fields */}
-            {capturedBase64 && (
-              <div style={{ background: "#131315", borderRadius: 24, padding: 20, marginBottom: 16 }}>
-                <div style={{ fontSize: 10, color: "#A1A1A1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 16 }}>Verify Details</div>
-                <div style={{ marginBottom: 12 }}>
-                  <label style={labelStyle}>Card Name</label>
-                  <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} />
-                </div>
-                <div style={{ marginBottom: 12 }}>
-                  <label style={labelStyle}>Set Name</label>
-                  <input style={inputStyle} value={cardSetName} onChange={e => setCardSetName(e.target.value)} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Card Number</label>
-                  <input style={inputStyle} value={number} onChange={e => setNumber(e.target.value)} />
-                </div>
-                {fetchError && (
-                  <button onClick={handleRetryLookup} disabled={loadingCard} style={{ marginTop: 12, background: "none", border: "1px solid #3A3A3C", color: loadingCard ? "#555" : "#A1A1A1", padding: "8px 14px", borderRadius: 9999, cursor: loadingCard ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, opacity: loadingCard ? 0.6 : 1 }}>
-                    {loadingCard ? "Looking up…" : "Retry lookup with edited fields"}
-                  </button>
-                )}
+            {/* Name search fallback */}
+            <div style={{ background: "#131315", borderRadius: 24, padding: 20, marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: "#A1A1A1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 16 }}>Wrong card? Search by name</div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <input style={{ ...inputStyle, flex: 1 }} value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && handleRetryLookup()} placeholder="Card name…" />
+                <button onClick={handleRetryLookup} disabled={loadingCard || !name.trim()} style={{ padding: "12px 16px", minHeight: 44, background: loadingCard || !name.trim() ? "#2C2C2E" : "#00C4BC", border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, cursor: loadingCard || !name.trim() ? "not-allowed" : "pointer", fontSize: 14, flexShrink: 0, opacity: loadingCard || !name.trim() ? 0.5 : 1 }}>
+                  {loadingCard ? "…" : "Search"}
+                </button>
               </div>
-            )}
+              {fetchError && <div style={{ marginTop: 10, color: "#fca5a5", fontSize: 13 }}>{fetchError}</div>}
+            </div>
           </div>
 
           {/* Fixed action bar */}
