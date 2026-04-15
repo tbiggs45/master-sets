@@ -673,16 +673,26 @@
     async function identifyCardWithVision(base64) {
       const backendURL = (window.POKEBINDER_SCAN_ENDPOINT || "").trim();
       if (backendURL) {
-        const response = await fetch(`${backendURL.replace(/\/$/, "")}/identify-card`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: base64 }),
-        });
-        if (!response.ok) {
-          if (response.status === 429) throw new Error("RATE_LIMITED");
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData?.error || `Backend scan error ${response.status}`);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 55000);
+        try {
+          const response = await fetch(`${backendURL.replace(/\/$/, "")}/identify-card`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageBase64: base64 }),
+            signal: controller.signal,
+          });
+          if (!response.ok) {
+            if (response.status === 429) throw new Error("RATE_LIMITED");
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData?.error || `Backend scan error ${response.status}`);
+          }
+          return response.json();
+        } catch (e) {
+          if (e.name === "AbortError") throw new Error("TIMEOUT");
+          throw e;
+        } finally {
+          clearTimeout(timer);
         }
-        return response.json();
       }
       const apiKey = window.ANTHROPIC_API_KEY || "";
       if (!apiKey || apiKey === "demo") throw new Error("NO_SCAN_BACKEND");
@@ -690,7 +700,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
+          model: "claude-sonnet-4-6", max_tokens: 1000,
           system: `You are a Pokémon TCG card identification assistant. When given an image of a Pokémon card, identify it precisely and return ONLY a JSON object with no preamble or markdown backticks.\n\nReturn this exact structure:\n{\n  "name": "card name as printed",\n  "setName": "set name as printed",\n  "number": "card number as printed (e.g. 001/167)",\n  "rarity": "rarity as printed or inferred from rarity symbol",\n  "confidence": "high|medium|low",\n  "notes": "any issues, ambiguity, or important observations"\n}\n\nIf the image is blurry, obstructed, or not a Pokémon card, set confidence to low and explain in notes.`,
           messages: [{ role: "user", content: [
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
@@ -749,6 +759,126 @@
       const sets = data.data ?? [];
       try { await window.storage.set(cacheKey, JSON.stringify({ timestamp: Date.now(), sets })); } catch (e) {}
       return sets;
+    }
+
+    // ── TCGdex (non-English sets) ─────────────────────────────────────────────
+
+    const TCGDEX_LANGS = [
+      { code: "ja",    name: "Japanese",              native: "日本語"           },
+      { code: "ko",    name: "Korean",                native: "한국어"           },
+      { code: "zh-tw", name: "Chinese (Traditional)", native: "繁體中文"         },
+      { code: "zh-cn", name: "Chinese (Simplified)",  native: "简体中文"         },
+      { code: "fr",    name: "French",                native: "Français"         },
+      { code: "de",    name: "German",                native: "Deutsch"          },
+      { code: "es",    name: "Spanish",               native: "Español"          },
+      { code: "it",    name: "Italian",               native: "Italiano"         },
+      { code: "pt",    name: "Portuguese",            native: "Português"        },
+      { code: "id",    name: "Indonesian",            native: "Bahasa Indonesia" },
+      { code: "th",    name: "Thai",                  native: "ภาษาไทย"         },
+    ];
+
+    async function fetchTcgdexSets(lang) {
+      const cacheKey = `tcgdex_sets_${lang}`;
+      try {
+        const cached = await window.storage.get(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached.value);
+          if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) return parsed.sets;
+        }
+      } catch (e) {}
+      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/sets`);
+      if (!res.ok) throw new Error(`TCGdex error ${res.status}`);
+      const raw = await res.json();
+      const sets = (Array.isArray(raw) ? raw : []).map(s => ({
+        id: `tcgdex-${lang}-${s.id}`,
+        _tcgdexId: s.id,
+        _source: "tcgdex",
+        _lang: lang,
+        name: s.name || s.id,
+        series: s.serie?.name || "",
+        releaseDate: s.releaseDate || "",
+        total: s.cardCount?.total ?? 0,
+        printedTotal: s.cardCount?.official ?? s.cardCount?.total ?? 0,
+        images: {
+          logo: s.logo ? s.logo + ".png" : null,
+          symbol: s.symbol ? s.symbol + ".png" : null,
+        },
+      })).sort((a, b) => (b.releaseDate || "").localeCompare(a.releaseDate || ""));
+      try { await window.storage.set(cacheKey, JSON.stringify({ timestamp: Date.now(), sets })); } catch (e) {}
+      return sets;
+    }
+
+    async function fetchTcgdexSetCards(lang, tcgdexSetId, normalizedSetId) {
+      const cacheKey = `set_cache_${normalizedSetId}`;
+      try {
+        const cached = await window.storage.get(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached.value);
+          if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) return parsed.cards;
+        }
+      } catch (e) {}
+      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${tcgdexSetId}`);
+      if (!res.ok) throw new Error("Could not load set cards");
+      const setData = await res.json();
+      const cards = (setData.cards || []).map(c => ({
+        id: c.id || `${normalizedSetId}-${c.localId}`,
+        name: c.name || `Card ${c.localId}`,
+        number: String(c.localId || ""),
+        rarity: c.rarity || "",
+        images: {
+          small: c.image ? c.image + "/low.webp" : "",
+          large: c.image ? c.image + "/high.webp" : "",
+        },
+        set: {
+          id: normalizedSetId,
+          name: setData.name || tcgdexSetId,
+          series: setData.serie?.name || "",
+          images: {
+            logo: setData.logo ? setData.logo + ".png" : null,
+            symbol: setData.symbol ? setData.symbol + ".png" : null,
+          },
+        },
+        _source: "tcgdex",
+        _lang: lang,
+      }));
+      try { await window.storage.set(cacheKey, JSON.stringify({ timestamp: Date.now(), cards })); } catch (e) {}
+      return cards;
+    }
+
+    // Detect likely card language from script used in name/setName
+    function detectCardLanguage(name, setName) {
+      const text = (name || "") + " " + (setName || "");
+      if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return ["ja"];           // Hiragana/Katakana → Japanese
+      if (/[\uAC00-\uD7AF\u1100-\u11FF]/.test(text)) return ["ko"];            // Hangul → Korean
+      if (/[\u4E00-\u9FFF\u3400-\u4DBF]/.test(text)) return ["zh-tw", "zh-cn", "ja"]; // CJK → Chinese/Japanese
+      if (/[\u0E00-\u0E7F]/.test(text)) return ["th"];                         // Thai script → Thai
+      return ["fr", "de", "es", "it", "pt", "id"];                             // Latin-script → European/other
+    }
+
+    // Lookup a card on TCGdex when pokemontcg.io returns nothing (non-English cards)
+    async function fetchTcgdexCardByNameAndSet(cardName, setName, cardNumber) {
+      const langsToTry = detectCardLanguage(cardName, setName);
+      const normalizedNumber = (cardNumber || "").split("/")[0].replace(/^0+/, "");
+      for (const lang of langsToTry) {
+        try {
+          const sets = await fetchTcgdexSets(lang);
+          const searchTerm = (setName || "").toLowerCase().trim();
+          const matchingSet = searchTerm
+            ? sets.find(s => {
+                const sn = s.name.toLowerCase();
+                return sn === searchTerm || sn.includes(searchTerm) || searchTerm.includes(sn);
+              })
+            : null;
+          if (!matchingSet) continue;
+          const cards = await fetchTcgdexSetCards(lang, matchingSet._tcgdexId, matchingSet.id);
+          const card = cards.find(c => {
+            const cn = String(c.number || "").replace(/^0+/, "");
+            return cn === normalizedNumber || c.number === cardNumber;
+          });
+          if (card) return card;
+        } catch (e) { /* try next language */ }
+      }
+      return null;
     }
 
     async function fetchCardByNameAndSet(name, setName, fallbackNumber) {
@@ -1114,8 +1244,18 @@
       const [identifying, setIdentifying] = useState(false);
       const [identifyError, setIdentifyError] = useState(null);
       const [toast, setToast] = useState(null);
+      const [stabilityProgress, setStabilityProgress] = useState(0);
       const showToast = (message, type = "error") => setToast({ message, type });
       const mountedRef = useRef(true);
+      const identifyingRef = useRef(false);
+      const stableCountRef = useRef(0);
+      const lastFrameRef = useRef(null);
+      const stabilityIntervalRef = useRef(null);
+
+      const STABLE_NEEDED = 8;   // 8 × 200 ms ≈ 1.6 s of stillness to auto-fire
+      const SAMPLE_MS    = 200;
+      const DIFF_THRESH  = 10;   // avg per-channel pixel diff that counts as "still"
+
       useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
       const startCamera = useCallback(async () => {
@@ -1137,26 +1277,77 @@
 
       useEffect(() => {
         startCamera();
-        return () => { setStream(s => { if (s) s.getTracks().forEach(t => t.stop()); return null; }); };
+        return () => {
+          if (stabilityIntervalRef.current) { clearInterval(stabilityIntervalRef.current); stabilityIntervalRef.current = null; }
+          setStream(s => { if (s) s.getTracks().forEach(t => t.stop()); return null; });
+        };
       }, [startCamera]);
 
-      async function handleIdentify(base64) {
-        setIdentifying(true); setIdentifyError(null);
+      // Stability detection: runs while camera is ready and not identifying
+      useEffect(() => {
+        if (!cameraReady || identifying) {
+          if (stabilityIntervalRef.current) { clearInterval(stabilityIntervalRef.current); stabilityIntervalRef.current = null; }
+          if (!identifying) { stableCountRef.current = 0; lastFrameRef.current = null; setStabilityProgress(0); }
+          return;
+        }
+        stableCountRef.current = 0; lastFrameRef.current = null; setStabilityProgress(0);
+
+        stabilityIntervalRef.current = setInterval(() => {
+          if (!mountedRef.current || identifyingRef.current || !videoRef.current) return;
+          const video = videoRef.current;
+          if (!video.videoWidth) return;
+          const c = document.createElement("canvas"); c.width = 120; c.height = 80;
+          const ctx = c.getContext("2d"); if (!ctx) return;
+          ctx.drawImage(video, 0, 0, 120, 80);
+          const curr = ctx.getImageData(0, 0, 120, 80).data;
+          const prev = lastFrameRef.current;
+          lastFrameRef.current = curr;
+          if (!prev) return;
+
+          let sum = 0;
+          for (let i = 0; i < prev.length; i += 4)
+            sum += (Math.abs(prev[i]-curr[i]) + Math.abs(prev[i+1]-curr[i+1]) + Math.abs(prev[i+2]-curr[i+2])) / 3;
+          const avgDiff = sum / (prev.length / 4);
+
+          if (avgDiff < DIFF_THRESH) stableCountRef.current = Math.min(stableCountRef.current + 1, STABLE_NEEDED);
+          else stableCountRef.current = Math.max(0, stableCountRef.current - 1);
+
+          setStabilityProgress(stableCountRef.current / STABLE_NEEDED);
+
+          if (stableCountRef.current >= STABLE_NEEDED && !identifyingRef.current) {
+            clearInterval(stabilityIntervalRef.current); stabilityIntervalRef.current = null;
+            try { const base64 = captureFrame(video); doIdentify(base64); } catch {}
+          }
+        }, SAMPLE_MS);
+
+        return () => { if (stabilityIntervalRef.current) { clearInterval(stabilityIntervalRef.current); stabilityIntervalRef.current = null; } };
+      }, [cameraReady, identifying]);
+
+      async function doIdentify(base64) {
+        if (identifyingRef.current) return;
+        identifyingRef.current = true;
+        setIdentifying(true); setIdentifyError(null); setStabilityProgress(0);
         try {
           const visionResult = await identifyCardWithVision(base64);
-          navigate("confirm", { visionResult, capturedBase64: base64 });
+          if (mountedRef.current) navigate("confirm", { visionResult, capturedBase64: base64 });
         } catch (e) {
+          if (!mountedRef.current) return;
           const msg = e.message.includes("NO_SCAN_BACKEND") ? "Card scanning is coming soon — stay tuned!"
             : e.message.includes("RATE_LIMITED") ? "Too many scans — try again in a moment"
+            : e.message.includes("TIMEOUT") ? "Server is waking up — this can take ~30 s on first use. Try again."
             : e.message.includes("401") || e.message.includes("403") ? "Scan service unavailable — try again later"
             : "Couldn't identify card — try better lighting or a clearer angle";
           setIdentifyError(msg); showToast(msg, "error");
-        } finally { setIdentifying(false); }
+        } finally {
+          identifyingRef.current = false;
+          if (mountedRef.current) setIdentifying(false);
+        }
       }
 
       function handleCapture() {
-        if (!videoRef.current || !cameraReady) return;
-        handleIdentify(captureFrame(videoRef.current));
+        if (!videoRef.current || !cameraReady || identifyingRef.current) return;
+        if (stabilityIntervalRef.current) { clearInterval(stabilityIntervalRef.current); stabilityIntervalRef.current = null; }
+        try { doIdentify(captureFrame(videoRef.current)); } catch {}
       }
 
       function handleFileUpload(e) {
@@ -1165,11 +1356,21 @@
         reader.onload = ev => {
           const base64 = (ev.target.result || "").split(",")[1];
           if (!base64) { showToast("Could not read image — please try another file", "error"); return; }
-          handleIdentify(base64);
+          doIdentify(base64);
         };
         reader.onerror = () => showToast("Could not read that file", "error");
         reader.readAsDataURL(file);
       }
+
+      // SVG progress ring around the capture button
+      const RING_R = 44;
+      const RING_C = 2 * Math.PI * RING_R;
+      const ringOffset = RING_C * (1 - stabilityProgress);
+      const stabilityLabel = !cameraReady ? "Starting camera…"
+        : stabilityProgress === 0 ? "Position card in frame"
+        : stabilityProgress < 0.5 ? "Hold steady…"
+        : stabilityProgress < 0.9 ? "Almost there…"
+        : "Scanning…";
 
       return (
         <div style={{ height: "100vh", background: "#000000", color: "#FFFFFF", display: "flex", flexDirection: "column" }}>
@@ -1191,9 +1392,13 @@
                     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
                       <div style={{ position: "relative", width: "62%", aspectRatio: "2.5 / 3.5" }}>
                         <div style={{ position: "absolute", inset: 0, boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)", borderRadius: 12 }} />
-                        <div style={{ position: "absolute", inset: 0, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 12 }} />
+                        <div style={{ position: "absolute", inset: 0, border: "2px solid rgba(255,255,255,0.2)", borderRadius: 12 }} />
                         {[["0","0","borderTop","borderLeft"],["0","auto","borderTop","borderRight"],["auto","0","borderBottom","borderLeft"],["auto","auto","borderBottom","borderRight"]].map(([t,r,bv,bh],i) => (
-                          <div key={i} style={{ position: "absolute", top: t !== "auto" ? -1 : "auto", right: r !== "auto" ? -1 : "auto", bottom: t === "auto" ? -1 : "auto", left: r === "auto" ? -1 : "auto", width: 24, height: 24, [bv]: `3px solid #00C4BC`, [bh]: `3px solid #00C4BC`, borderRadius: i === 0 ? "10px 0 0 0" : i === 1 ? "0 10px 0 0" : i === 2 ? "0 0 0 10px" : "0 0 10px 0" }} />
+                          <div key={i} style={{ position: "absolute", top: t !== "auto" ? -1 : "auto", right: r !== "auto" ? -1 : "auto", bottom: t === "auto" ? -1 : "auto", left: r === "auto" ? -1 : "auto", width: 24, height: 24,
+                            [bv]: `3px solid ${stabilityProgress > 0 ? "#00C4BC" : "rgba(255,255,255,0.6)"}`,
+                            [bh]: `3px solid ${stabilityProgress > 0 ? "#00C4BC" : "rgba(255,255,255,0.6)"}`,
+                            borderRadius: i === 0 ? "10px 0 0 0" : i === 1 ? "0 10px 0 0" : i === 2 ? "0 0 0 10px" : "0 0 10px 0",
+                            transition: "border-color 0.2s" }} />
                         ))}
                       </div>
                     </div>
@@ -1204,18 +1409,27 @@
                     </div>
                   )}
                 </div>
-                <div style={{ padding: "24px 20px 32px", background: "rgba(19,19,21,0.98)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, flexShrink: 0 }}>
+                <div style={{ padding: "20px 20px 28px", background: "rgba(19,19,21,0.98)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", alignItems: "center", gap: 14, flexShrink: 0 }}>
                   {identifying ? <LoadingSpinner label="Analyzing card…" /> : (
                     <>
-                      <button onClick={handleCapture} disabled={!cameraReady} style={{
-                        width: 80, height: 80, borderRadius: "50%", background: "#00C4BC",
-                        border: "4px solid rgba(255,255,255,0.9)", cursor: cameraReady ? "pointer" : "not-allowed",
-                        opacity: cameraReady ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center",
-                        boxShadow: "0 6px 28px rgba(0,196,188,0.5), 0 0 0 8px rgba(0,196,188,0.15)",
-                      }}>
-                        <MatIcon name="photo_camera" size={32} color="#fff" />
-                      </button>
-                      <span style={{ fontSize: 13, color: "#A1A1A1", fontWeight: 600, letterSpacing: "0.02em" }}>Hold card in frame and tap to scan</span>
+                      {/* Auto-capture progress ring */}
+                      <div style={{ position: "relative", width: 100, height: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="100" height="100" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
+                          <circle cx="50" cy="50" r={RING_R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
+                          <circle cx="50" cy="50" r={RING_R} fill="none" stroke="#00C4BC" strokeWidth="4"
+                            strokeDasharray={RING_C} strokeDashoffset={ringOffset} strokeLinecap="round"
+                            style={{ transition: "stroke-dashoffset 0.15s ease" }} />
+                        </svg>
+                        <button onClick={handleCapture} disabled={!cameraReady} style={{
+                          width: 72, height: 72, borderRadius: "50%", background: cameraReady ? "#00C4BC" : "#2C2C2E",
+                          border: "none", cursor: cameraReady ? "pointer" : "not-allowed",
+                          opacity: cameraReady ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center",
+                          boxShadow: cameraReady ? "0 4px 20px rgba(0,196,188,0.4)" : "none",
+                        }}>
+                          <MatIcon name="photo_camera" size={28} color="#fff" />
+                        </button>
+                      </div>
+                      <span style={{ fontSize: 13, color: stabilityProgress > 0 ? "#00C4BC" : "#A1A1A1", fontWeight: 600, letterSpacing: "0.02em", transition: "color 0.2s" }}>{stabilityLabel}</span>
                       <div style={{ display: "flex", gap: 12 }}>
                         <label style={{ display: "flex", alignItems: "center", gap: 6, color: "#A1A1A1", fontSize: 13, cursor: "pointer", padding: "10px 18px", background: "#1C1C1E", border: "none", borderRadius: 9999, fontWeight: 700, minHeight: 44 }}>
                           <MatIcon name="upload" size={16} color="#A1A1A1" /> Upload
@@ -1291,9 +1505,12 @@
       async function lookupCard(cardName, sName, cardNumber) {
         setLoadingCard(true); setFetchError(null);
         try {
-          const card = await fetchCardByNameAndSet(cardName, sName, cardNumber);
+          // Try English (pokemontcg.io) first
+          let card = await fetchCardByNameAndSet(cardName, sName, cardNumber);
+          // Fall back to non-English (TCGdex) if not found
+          if (!card) card = await fetchTcgdexCardByNameAndSet(cardName, sName, cardNumber);
           setTcgCard(card);
-          if (!card) setFetchError("Card not found in TCG database");
+          if (!card) setFetchError("Card not found — try editing the name or set below and searching again");
         } catch (e) {
           if (e.message === "RATE_LIMITED") { setFetchError("Rate limited — try again in a moment"); showToast("Too many requests — try again in a moment", "warning"); }
           else setFetchError("Could not fetch card data");
@@ -1439,7 +1656,12 @@
     }
 
     // ── BinderScreen ─────────────────────────────────────────────────────────
-    function BinderScreen({ setId, initialCardId, navigate, goBack }) {
+    function BinderScreen({ setId, setLang: setLangProp, setSource: setSourceProp, initialCardId, navigate, goBack }) {
+      // Support both explicit props (from "All Sets" navigation) and prefix-encoded IDs
+      // (from "My Sets" navigation where only setId is stored in the collection)
+      const isTcgdex = setSourceProp === "tcgdex" || (setId || "").startsWith("tcgdex-");
+      const effectiveLang = setLangProp || (isTcgdex ? (setId || "").split("-")[1] : null);
+      const tcgdexRawId = isTcgdex && effectiveLang ? (setId || "").replace(`tcgdex-${effectiveLang}-`, "") : null;
       const [collection, setCollection] = useState(null);
       const [setCards, setSetCards] = useState([]);
       const [loading, setLoading] = useState(true);
@@ -1468,7 +1690,9 @@
             const [favoriteCards, wishlistCards] = await Promise.all([loadCardList(FAVORITES_KEY), loadCardList(WISHLIST_KEY)]);
             if (!mounted) return;
             setFavorites(favoriteCards); setWishlist(wishlistCards);
-            const cards = await fetchSetCards(setId);
+            const cards = isTcgdex
+              ? await fetchTcgdexSetCards(effectiveLang, tcgdexRawId, setId)
+              : await fetchSetCards(setId);
             if (!mounted) return;
             cards.sort((a, b) => {
               const numA = parseInt((a.number || "").replace(/\D/g, '')) || 0;
@@ -1477,9 +1701,11 @@
               return (a.number || "").localeCompare(b.number || "");
             });
             setSetCards(cards);
-            const refreshedCol = await refreshSetPrices(setId, cards, col);
-            if (!mounted) return;
-            setCollection(refreshedCol);
+            if (!isTcgdex) {
+              const refreshedCol = await refreshSetPrices(setId, cards, col);
+              if (!mounted) return;
+              setCollection(refreshedCol);
+            }
           } catch (e) {
             if (mounted) setError(
               e.message === "OFFLINE" ? "No internet connection — check your network and try again" :
@@ -1931,12 +2157,12 @@
 
       return (
         <div style={{ minHeight: "100vh", background: "#000000", color: "#FFFFFF", paddingBottom: 100 }}>
-          <div className="safe-t16" style={{ padding: "16px 20px", background: "rgba(28,28,30,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="safe-t16" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} style={{ padding: "16px 20px", background: "rgba(28,28,30,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10, cursor: "pointer" }}>
             <div style={{ width: 36, height: 36, background: "#00C4BC", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <MatIcon name="search" size={18} color="#fff" />
             </div>
             <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: "-0.02em", textTransform: "uppercase" }}>Search Cards</span>
-            <button onClick={goBack || (() => navigate("search"))} style={{ marginLeft: "auto", background: "none", border: "none", color: "#A1A1A1", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontWeight: 700, fontSize: 14, padding: "8px", minHeight: 44, minWidth: 44 }}>
+            <button onClick={e => { e.stopPropagation(); (goBack || (() => navigate("search")))(); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#A1A1A1", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontWeight: 700, fontSize: 14, padding: "8px", minHeight: 44, minWidth: 44 }}>
               <MatIcon name="arrow_back" size={18} color="#A1A1A1" />
             </button>
           </div>
@@ -2372,7 +2598,7 @@
     function SearchHubScreen({ navigate }) {
       return (
         <div style={{ minHeight: "100vh", background: "#000000", color: "#FFFFFF", paddingBottom: 100 }}>
-          <div className="safe-t16" style={{ padding: "16px 20px 14px", background: "rgba(28,28,30,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
+          <div className="safe-t16" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} style={{ padding: "16px 20px 14px", background: "rgba(28,28,30,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 10, cursor: "pointer" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <img src="./MSLogo_noBak.png" alt="Master Sets" onError={e => { e.currentTarget.onerror = null; e.currentTarget.style.opacity = "0"; }} style={{ width: 38, height: 38, objectFit: "contain", flexShrink: 0 }} />
               <div>
@@ -2558,6 +2784,9 @@
       );
     }
 
+    // Persists binder-tab state across unmounts so back-navigation restores position
+    const _binderViewState = window._binderViewState || (window._binderViewState = { activeTab: "my", setsLang: "en" });
+
     // ── DashboardScreen ───────────────────────────────────────────────────────
     function DashboardScreen({ navigate, authState, authLoading, mode = "home" }) {
       const [collection, setCollection] = useState(null);
@@ -2569,12 +2798,21 @@
       const [allSetsError, setAllSetsError] = useState(null);
       const [loading, setLoading] = useState(true);
       const [toast, setToast] = useState(null);
-      const [activeTab, setActiveTab] = useState("my");
+      const [activeTab, setActiveTabState] = useState(mode === "binder" ? _binderViewState.activeTab : "my");
+      const setActiveTab = (v) => { if (mode === "binder") _binderViewState.activeTab = v; setActiveTabState(v); };
       const [allSetsPage, setAllSetsPage] = useState(60);
       const [favorites, setFavorites] = useState({});
       const [wishlist, setWishlist] = useState({});
       const [selectedSavedCard, setSelectedSavedCard] = useState(null);
       const [enrichedCards, setEnrichedCards] = useState({});
+      const [setsLang, setSetsLangState] = useState(mode === "binder" ? _binderViewState.setsLang : "en");
+      const setSetsLang = (v) => { if (mode === "binder") _binderViewState.setsLang = v; setSetsLangState(v); };
+      const [foreignSets, setForeignSets] = useState([]);
+      const [foreignSetsLoading, setForeignSetsLoading] = useState(false);
+      const [foreignSetsError, setForeignSetsError] = useState(null);
+      const [foreignSetsPage, setForeignSetsPage] = useState(60);
+      const [showMoreLangs, setShowMoreLangs] = useState(false);
+      const foreignSetsCacheRef = useRef({});
       const isHomeMode = mode === "home";
 
       useEffect(() => {
@@ -2674,6 +2912,27 @@
         loadAllSets();
         return () => { mounted = false; };
       }, [activeTab, allSets.length, allSetsLoading]);
+
+      useEffect(() => {
+        if (isHomeMode || activeTab !== "all") return;
+        if (setsLang === "en") { setForeignSets([]); setForeignSetsLoading(false); setForeignSetsError(null); return; }
+        if (foreignSetsCacheRef.current[setsLang]) {
+          setForeignSets(foreignSetsCacheRef.current[setsLang]);
+          setForeignSetsLoading(false);
+          return;
+        }
+        let mounted = true;
+        setForeignSetsLoading(true); setForeignSetsError(null); setForeignSets([]);
+        fetchTcgdexSets(setsLang)
+          .then(sets => {
+            if (!mounted) return;
+            foreignSetsCacheRef.current[setsLang] = sets;
+            setForeignSets(sets); setForeignSetsPage(60);
+          })
+          .catch(() => { if (mounted) setForeignSetsError("Could not load sets for this language — check your connection"); })
+          .finally(() => { if (mounted) setForeignSetsLoading(false); });
+        return () => { mounted = false; };
+      }, [setsLang, activeTab, isHomeMode]);
 
       const cards = collection ? Object.values(collection.cards) : [];
       const uniqueCount = cards.length;
@@ -2867,50 +3126,112 @@
                     ) : activeTab === "all" ? (
                       <>
                         <div style={{ fontSize: 10, color: "#A1A1A1", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 14, fontWeight: 700 }}>All Sets</div>
-                        {allSetsLoading ? <LoadingSpinner label="Loading set series…" /> : allSetsError ? (
-                          <div style={{ background: "rgba(0,196,188,0.08)", borderRadius: 16, padding: "12px 16px", color: "#fca5a5", fontSize: 14 }}>{allSetsError}</div>
+
+                        {/* Language selector */}
+                        <div style={{ display: "flex", gap: 8, marginBottom: showMoreLangs ? 0 : 16 }}>
+                          <button onClick={() => { setSetsLang("en"); setShowMoreLangs(false); }} style={{ padding: "9px 18px", borderRadius: 9999, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12, background: setsLang === "en" ? "#00C4BC" : "#1C1C1E", color: "#fff", textTransform: "uppercase", letterSpacing: "0.06em" }}>English</button>
+                          <button onClick={() => setShowMoreLangs(m => !m)} style={{ padding: "9px 18px", borderRadius: 9999, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12, background: setsLang !== "en" ? "#00C4BC" : "#1C1C1E", color: "#fff", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>Other Languages {showMoreLangs ? "▲" : "▼"}</button>
+                        </div>
+                        {showMoreLangs && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16, padding: "14px 0 6px", borderTop: "1px solid #1C1C1E" }}>
+                            {TCGDEX_LANGS.map(lang => (
+                              <button key={lang.code} onClick={() => { setSetsLang(lang.code); setShowMoreLangs(false); }} style={{ padding: "8px 16px", borderRadius: 9999, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: setsLang === lang.code ? "#00C4BC" : "#131315", color: setsLang === lang.code ? "#fff" : "#A1A1A1", whiteSpace: "nowrap" }}>{lang.native} <span style={{ fontSize: 10, opacity: 0.65 }}>· {lang.name}</span></button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Sets list — keyed to setsLang so React fully replaces the subtree on language change */}
+                        <div key={setsLang}>
+                        {setsLang === "en" ? (
+                          allSetsLoading ? <LoadingSpinner label="Loading sets…" /> : allSetsError ? (
+                            <div style={{ background: "rgba(0,196,188,0.08)", borderRadius: 16, padding: "12px 16px", color: "#fca5a5", fontSize: 14 }}>{allSetsError}</div>
+                          ) : (
+                            <>
+                              <div style={{ color: "#A1A1A1", fontSize: 13, marginBottom: 14 }}>Browse available Pokémon TCG sets and open any binder view.</div>
+                              {visibleAllSets.map(set => {
+                                const chaseCount = (set.total && set.printedTotal && set.total > set.printedTotal) ? set.total - set.printedTotal : 0;
+                                return (
+                                  <div key={set.id} onClick={() => navigate("binder", { setId: set.id })} className="list-row"
+                                    style={{ background: "#131315", borderRadius: 24, padding: "16px 18px", marginBottom: 10, cursor: "pointer" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                                      {set.images?.logo ? (
+                                        <div style={{ width: 80, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                          <img src={set.images.logo} alt={set.name} loading="lazy" onError={e => { e.currentTarget.onerror = null; e.currentTarget.style.opacity = "0"; }} style={{ maxWidth: 80, maxHeight: 40, objectFit: "contain" }} />
+                                        </div>
+                                      ) : set.images?.symbol ? (
+                                        <img src={set.images.symbol} alt={set.name} loading="lazy" onError={e => { e.currentTarget.onerror = null; e.currentTarget.style.opacity = "0"; }} style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }} />
+                                      ) : null}
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontWeight: 800, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{set.name}</div>
+                                        <div style={{ color: "#A1A1A1", fontSize: 12, marginTop: 2 }}>{set.series || "Pokémon TCG"}</div>
+                                      </div>
+                                      <MatIcon name="chevron_right" size={18} color="#3A3A3C" />
+                                    </div>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <div style={{ flex: 1, background: "#1C1C1E", borderRadius: 16, padding: "10px 12px" }}>
+                                        <div style={{ fontSize: 9, color: "#A1A1A1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>All Cards</div>
+                                        <div style={{ fontSize: 22, fontWeight: 900, color: "#FFFFFF", lineHeight: 1, letterSpacing: "-0.02em" }}>{set.total ?? "—"}</div>
+                                      </div>
+                                      <div style={{ flex: 1, background: "#1C1C1E", borderRadius: 16, padding: "10px 12px" }}>
+                                        <div style={{ fontSize: 9, color: "#A1A1A1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>Chase</div>
+                                        <div style={{ fontSize: 22, fontWeight: 900, color: chaseCount > 0 ? "#00C4BC" : "#A1A1A1", lineHeight: 1, letterSpacing: "-0.02em" }}>{chaseCount > 0 ? chaseCount : "—"}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {allSets.length > allSetsPage && (
+                                <button onClick={() => setAllSetsPage(p => p + 60)} style={{ width: "100%", padding: "14px", background: "#131315", border: "none", borderRadius: 9999, color: "#A1A1A1", fontWeight: 800, fontSize: 13, cursor: "pointer", marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                  Load More ({allSets.length - allSetsPage} remaining)
+                                </button>
+                              )}
+                            </>
+                          )
                         ) : (
-                          <>
-                            <div style={{ color: "#A1A1A1", fontSize: 13, marginBottom: 14 }}>Browse available Pokemon TCG sets and open any binder view.</div>
-                            {visibleAllSets.map(set => {
-                              const chaseCount = (set.total && set.printedTotal && set.total > set.printedTotal) ? set.total - set.printedTotal : 0;
-                              return (
-                                <div key={set.id} onClick={() => navigate("binder", { setId: set.id })} className="list-row"
+                          foreignSetsLoading ? <LoadingSpinner label="Loading sets…" /> : foreignSetsError ? (
+                            <div style={{ background: "rgba(0,196,188,0.08)", borderRadius: 16, padding: "12px 16px", color: "#fca5a5", fontSize: 14 }}>{foreignSetsError}</div>
+                          ) : foreignSets.length === 0 ? (
+                            <div style={{ background: "#131315", borderRadius: 24, padding: "40px 24px", textAlign: "center" }}>
+                              <div style={{ fontSize: 15, color: "#A1A1A1" }}>No sets found for this language.</div>
+                            </div>
+                          ) : (
+                            <>
+                              <div style={{ color: "#A1A1A1", fontSize: 13, marginBottom: 14 }}>{foreignSets.length} sets · Pricing not available for non-English sets.</div>
+                              {foreignSets.slice(0, foreignSetsPage).map(set => (
+                                <div key={set.id} onClick={() => navigate("binder", { setId: set.id, setLang: set._lang, setSource: set._source })} className="list-row"
                                   style={{ background: "#131315", borderRadius: 24, padding: "16px 18px", marginBottom: 10, cursor: "pointer" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                     {set.images?.logo ? (
                                       <div style={{ width: 80, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                                         <img src={set.images.logo} alt={set.name} loading="lazy" onError={e => { e.currentTarget.onerror = null; e.currentTarget.style.opacity = "0"; }} style={{ maxWidth: 80, maxHeight: 40, objectFit: "contain" }} />
                                       </div>
                                     ) : set.images?.symbol ? (
                                       <img src={set.images.symbol} alt={set.name} loading="lazy" onError={e => { e.currentTarget.onerror = null; e.currentTarget.style.opacity = "0"; }} style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }} />
-                                    ) : null}
+                                    ) : (
+                                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "#2C2C2E", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                        <MatIcon name="auto_stories" size={18} color="#6C6C6E" />
+                                      </div>
+                                    )}
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ fontWeight: 800, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{set.name}</div>
-                                      <div style={{ color: "#A1A1A1", fontSize: 12, marginTop: 2 }}>{set.series || "Pokemon TCG"}</div>
+                                      <div style={{ color: "#A1A1A1", fontSize: 12, marginTop: 2 }}>{set.series || "Pokémon TCG"}{set.releaseDate ? ` · ${set.releaseDate.slice(0, 4)}` : ""}</div>
                                     </div>
-                                    <MatIcon name="chevron_right" size={18} color="#3A3A3C" />
-                                  </div>
-                                  <div style={{ display: "flex", gap: 8 }}>
-                                    <div style={{ flex: 1, background: "#1C1C1E", borderRadius: 16, padding: "10px 12px" }}>
-                                      <div style={{ fontSize: 9, color: "#A1A1A1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>All Cards</div>
-                                      <div style={{ fontSize: 22, fontWeight: 900, color: "#FFFFFF", lineHeight: 1, letterSpacing: "-0.02em" }}>{set.total ?? "—"}</div>
-                                    </div>
-                                    <div style={{ flex: 1, background: "#1C1C1E", borderRadius: 16, padding: "10px 12px" }}>
-                                      <div style={{ fontSize: 9, color: "#A1A1A1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>Chase</div>
-                                      <div style={{ fontSize: 22, fontWeight: 900, color: chaseCount > 0 ? "#00C4BC" : "#A1A1A1", lineHeight: 1, letterSpacing: "-0.02em" }}>{chaseCount > 0 ? chaseCount : "—"}</div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                                      {set.total > 0 && <div style={{ background: "#1C1C1E", borderRadius: 9999, padding: "4px 10px", fontSize: 11, fontWeight: 800, color: "#A1A1A1" }}>{set.total}</div>}
+                                      <MatIcon name="chevron_right" size={18} color="#3A3A3C" />
                                     </div>
                                   </div>
                                 </div>
-                              );
-                            })}
-                            {allSets.length > allSetsPage && (
-                              <button onClick={() => setAllSetsPage(p => p + 60)} style={{ width: "100%", padding: "14px", background: "#131315", border: "none", borderRadius: 9999, color: "#A1A1A1", fontWeight: 800, fontSize: 13, cursor: "pointer", marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                                Load More ({allSets.length - allSetsPage} remaining)
-                              </button>
-                            )}
-                          </>
+                              ))}
+                              {foreignSets.length > foreignSetsPage && (
+                                <button onClick={() => setForeignSetsPage(p => p + 60)} style={{ width: "100%", padding: "14px", background: "#131315", border: "none", borderRadius: 9999, color: "#A1A1A1", fontWeight: 800, fontSize: 13, cursor: "pointer", marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                  Load More ({foreignSets.length - foreignSetsPage} remaining)
+                                </button>
+                              )}
+                            </>
+                          )
                         )}
+                        </div>
                       </>
                     ) : (() => {
                       const isFavTab = activeTab === "favorites";
@@ -3075,7 +3396,7 @@
           {!showingOverlay && activeTab === "user" && <ProfileScreen authState={authState} authLoading={authLoading} refreshAuth={refreshAuth} navigate={navigate} embedded={true} />}
 
           {screen === "confirm" && <ConfirmScreen visionResult={screenProps.visionResult} capturedBase64={screenProps.capturedBase64} navigate={navigate} goBack={goBack} />}
-          {screen === "binder" && <BinderScreen setId={screenProps.setId} initialCardId={screenProps.initialCardId} navigate={navigate} goBack={goBack} />}
+          {screen === "binder" && <BinderScreen setId={screenProps.setId} setLang={screenProps.setLang} setSource={screenProps.setSource} initialCardId={screenProps.initialCardId} navigate={navigate} goBack={goBack} />}
           {screen === "manual" && <ManualEntryScreen prefillName={screenProps.prefillName || ""} prefillSet={screenProps.prefillSet || ""} navigate={navigate} goBack={goBack} />}
           {screen === "bulkImport" && <BulkImportScreen navigate={navigate} goBack={goBack} />}
 
