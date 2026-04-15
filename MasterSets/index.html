@@ -1244,18 +1244,10 @@
       const [identifying, setIdentifying] = useState(false);
       const [identifyError, setIdentifyError] = useState(null);
       const [toast, setToast] = useState(null);
-      const [stabilityProgress, setStabilityProgress] = useState(0);
       const [capturedFrame, setCapturedFrame] = useState(null);
       const showToast = (message, type = "error") => setToast({ message, type });
       const mountedRef = useRef(true);
       const identifyingRef = useRef(false);
-      const stableCountRef = useRef(0);
-      const lastFrameRef = useRef(null);
-      const stabilityIntervalRef = useRef(null);
-
-      const STABLE_NEEDED = 8;   // 8 × 200 ms ≈ 1.6 s of stillness to auto-fire
-      const SAMPLE_MS    = 200;
-      const DIFF_THRESH  = 10;   // avg per-channel pixel diff that counts as "still"
 
       useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
@@ -1279,50 +1271,9 @@
       useEffect(() => {
         startCamera();
         return () => {
-          if (stabilityIntervalRef.current) { clearInterval(stabilityIntervalRef.current); stabilityIntervalRef.current = null; }
           setStream(s => { if (s) s.getTracks().forEach(t => t.stop()); return null; });
         };
       }, [startCamera]);
-
-      // Stability detection: runs while camera is ready and not identifying
-      useEffect(() => {
-        if (!cameraReady || identifying) {
-          if (stabilityIntervalRef.current) { clearInterval(stabilityIntervalRef.current); stabilityIntervalRef.current = null; }
-          if (!identifying) { stableCountRef.current = 0; lastFrameRef.current = null; setStabilityProgress(0); }
-          return;
-        }
-        stableCountRef.current = 0; lastFrameRef.current = null; setStabilityProgress(0);
-
-        stabilityIntervalRef.current = setInterval(() => {
-          if (!mountedRef.current || identifyingRef.current || !videoRef.current) return;
-          const video = videoRef.current;
-          if (!video.videoWidth) return;
-          const c = document.createElement("canvas"); c.width = 120; c.height = 80;
-          const ctx = c.getContext("2d"); if (!ctx) return;
-          ctx.drawImage(video, 0, 0, 120, 80);
-          const curr = ctx.getImageData(0, 0, 120, 80).data;
-          const prev = lastFrameRef.current;
-          lastFrameRef.current = curr;
-          if (!prev) return;
-
-          let sum = 0;
-          for (let i = 0; i < prev.length; i += 4)
-            sum += (Math.abs(prev[i]-curr[i]) + Math.abs(prev[i+1]-curr[i+1]) + Math.abs(prev[i+2]-curr[i+2])) / 3;
-          const avgDiff = sum / (prev.length / 4);
-
-          if (avgDiff < DIFF_THRESH) stableCountRef.current = Math.min(stableCountRef.current + 1, STABLE_NEEDED);
-          else stableCountRef.current = Math.max(0, stableCountRef.current - 1);
-
-          setStabilityProgress(stableCountRef.current / STABLE_NEEDED);
-
-          if (stableCountRef.current >= STABLE_NEEDED && !identifyingRef.current) {
-            clearInterval(stabilityIntervalRef.current); stabilityIntervalRef.current = null;
-            try { const base64 = captureFrame(video); freezeAndIdentify(base64); } catch {}
-          }
-        }, SAMPLE_MS);
-
-        return () => { if (stabilityIntervalRef.current) { clearInterval(stabilityIntervalRef.current); stabilityIntervalRef.current = null; } };
-      }, [cameraReady, identifying]);
 
       async function doIdentify(base64) {
         if (identifyingRef.current) return;
@@ -1373,15 +1324,6 @@
         reader.readAsDataURL(file);
       }
 
-      // SVG progress ring around the capture button
-      const RING_R = 44;
-      const RING_C = 2 * Math.PI * RING_R;
-      const ringOffset = RING_C * (1 - stabilityProgress);
-      const stabilityLabel = !cameraReady ? "Starting camera…"
-        : stabilityProgress === 0 ? "Position card in frame"
-        : stabilityProgress < 0.5 ? "Hold steady…"
-        : stabilityProgress < 0.9 ? "Almost there…"
-        : "Scanning…";
 
       return (
         <div style={{ height: "100vh", background: "#000000", color: "#FFFFFF", display: "flex", flexDirection: "column" }}>
@@ -1409,10 +1351,9 @@
                         <div style={{ position: "absolute", inset: 0, border: "2px solid rgba(255,255,255,0.2)", borderRadius: 12 }} />
                         {[["0","0","borderTop","borderLeft"],["0","auto","borderTop","borderRight"],["auto","0","borderBottom","borderLeft"],["auto","auto","borderBottom","borderRight"]].map(([t,r,bv,bh],i) => (
                           <div key={i} style={{ position: "absolute", top: t !== "auto" ? -1 : "auto", right: r !== "auto" ? -1 : "auto", bottom: t === "auto" ? -1 : "auto", left: r === "auto" ? -1 : "auto", width: 24, height: 24,
-                            [bv]: `3px solid ${stabilityProgress > 0 ? "#00C4BC" : "rgba(255,255,255,0.6)"}`,
-                            [bh]: `3px solid ${stabilityProgress > 0 ? "#00C4BC" : "rgba(255,255,255,0.6)"}`,
-                            borderRadius: i === 0 ? "10px 0 0 0" : i === 1 ? "0 10px 0 0" : i === 2 ? "0 0 0 10px" : "0 0 10px 0",
-                            transition: "border-color 0.2s" }} />
+                            [bv]: "3px solid rgba(255,255,255,0.6)",
+                            [bh]: "3px solid rgba(255,255,255,0.6)",
+                            borderRadius: i === 0 ? "10px 0 0 0" : i === 1 ? "0 10px 0 0" : i === 2 ? "0 0 0 10px" : "0 0 10px 0" }} />
                         ))}
                       </div>
                     </div>
@@ -1426,24 +1367,15 @@
                 <div style={{ padding: "20px 20px 28px", background: "rgba(19,19,21,0.98)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", alignItems: "center", gap: 14, flexShrink: 0 }}>
                   {identifying ? <LoadingSpinner label="Analyzing card…" /> : (
                     <>
-                      {/* Auto-capture progress ring */}
-                      <div style={{ position: "relative", width: 100, height: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width="100" height="100" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
-                          <circle cx="50" cy="50" r={RING_R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
-                          <circle cx="50" cy="50" r={RING_R} fill="none" stroke="#00C4BC" strokeWidth="4"
-                            strokeDasharray={RING_C} strokeDashoffset={ringOffset} strokeLinecap="round"
-                            style={{ transition: "stroke-dashoffset 0.15s ease" }} />
-                        </svg>
-                        <button onClick={handleCapture} disabled={!cameraReady} style={{
-                          width: 72, height: 72, borderRadius: "50%", background: cameraReady ? "#00C4BC" : "#2C2C2E",
-                          border: "none", cursor: cameraReady ? "pointer" : "not-allowed",
-                          opacity: cameraReady ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center",
-                          boxShadow: cameraReady ? "0 4px 20px rgba(0,196,188,0.4)" : "none",
-                        }}>
-                          <MatIcon name="photo_camera" size={28} color="#fff" />
-                        </button>
-                      </div>
-                      <span style={{ fontSize: 13, color: stabilityProgress > 0 ? "#00C4BC" : "#A1A1A1", fontWeight: 600, letterSpacing: "0.02em", transition: "color 0.2s" }}>{stabilityLabel}</span>
+                      <button onClick={handleCapture} disabled={!cameraReady} style={{
+                        width: 72, height: 72, borderRadius: "50%", background: cameraReady ? "#00C4BC" : "#2C2C2E",
+                        border: "none", cursor: cameraReady ? "pointer" : "not-allowed",
+                        opacity: cameraReady ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center",
+                        boxShadow: cameraReady ? "0 4px 20px rgba(0,196,188,0.4)" : "none",
+                      }}>
+                        <MatIcon name="photo_camera" size={28} color="#fff" />
+                      </button>
+                      <span style={{ fontSize: 13, color: "#A1A1A1", fontWeight: 600, letterSpacing: "0.02em" }}>{cameraReady ? "Tap to scan" : "Starting camera…"}</span>
                       <div style={{ display: "flex", gap: 12 }}>
                         <label style={{ display: "flex", alignItems: "center", gap: 6, color: "#A1A1A1", fontSize: 13, cursor: "pointer", padding: "10px 18px", background: "#1C1C1E", border: "none", borderRadius: 9999, fontWeight: 700, minHeight: 44 }}>
                           <MatIcon name="upload" size={16} color="#A1A1A1" /> Upload
