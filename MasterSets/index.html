@@ -1241,7 +1241,7 @@
     }
 
     // ── ScanScreen ────────────────────────────────────────────────────────────
-    function ScanScreen({ navigate, goBack, embedded = false }) {
+    function ScanScreen({ navigate, goBack, embedded = false, visible = true }) {
       const videoRef = useRef(null);
       const [stream, setStream] = useState(null);
       const [cameraError, setCameraError] = useState(null);
@@ -1253,8 +1253,17 @@
       const showToast = (message, type = "error") => setToast({ message, type });
       const mountedRef = useRef(true);
       const identifyingRef = useRef(false);
+      const prevVisibleRef = useRef(true);
 
       useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+
+      // When returning from an overlay (confirm screen), clear frozen frame — stream is still alive
+      useEffect(() => {
+        if (visible && !prevVisibleRef.current) {
+          setCapturedFrame(null);
+        }
+        prevVisibleRef.current = visible;
+      }, [visible]);
 
       const startCamera = useCallback(async () => {
         try {
@@ -1293,6 +1302,8 @@
           setCapturedFrame(null);
           const msg = "Analysis timed out — please try again";
           setIdentifyError(msg); showToast(msg, "error");
+          setStream(s => { if (s) s.getTracks().forEach(t => t.stop()); return null; });
+          setCameraReady(false);
           startCamera();
         }, 35000);
 
@@ -1308,6 +1319,8 @@
             : "Couldn't identify card — try better lighting or a clearer angle";
           setIdentifyError(msg); showToast(msg, "error");
           setCapturedFrame(null);
+          setStream(s => { if (s) s.getTracks().forEach(t => t.stop()); return null; });
+          setCameraReady(false);
           startCamera();
         } finally {
           clearTimeout(safetyTimer);
@@ -1317,9 +1330,7 @@
       }
 
       function freezeAndIdentify(base64) {
-        if (stream) stream.getTracks().forEach(t => t.stop());
-        setStream(null);
-        setCameraReady(false);
+        // Keep stream alive — overlay will hide us, stream stays running for when we return
         setCapturedFrame(base64);
         doIdentify(base64);
       }
@@ -3381,7 +3392,7 @@
         <div style={{ height: "100%", fontFamily: "'Inter', sans-serif", background: "#000000" }}>
           {!showingOverlay && activeTab === "home" && <DashboardScreen navigate={navigate} authState={authState} authLoading={authLoading} mode="home" />}
           {!showingOverlay && activeTab === "binder" && <DashboardScreen navigate={navigate} authState={authState} authLoading={authLoading} mode="binder" />}
-          {!showingOverlay && activeTab === "camera" && <ScanScreen navigate={navigate} embedded={true} goBack={() => { setActiveTab(prevTab); setHistory([]); }} />}
+          {activeTab === "camera" && <div style={{ display: showingOverlay ? "none" : "block", height: "100%" }}><ScanScreen navigate={navigate} embedded={true} visible={!showingOverlay} goBack={() => { setActiveTab(prevTab); setHistory([]); }} /></div>}
           {!showingOverlay && activeTab === "search" && <SearchHubScreen navigate={navigate} />}
           {!showingOverlay && activeTab === "user" && <ProfileScreen authState={authState} authLoading={authLoading} refreshAuth={refreshAuth} navigate={navigate} embedded={true} />}
 
