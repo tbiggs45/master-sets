@@ -1462,6 +1462,18 @@
       const [toast, setToast] = useState(null);
       const [name, setName] = useState(visionResult?.name ?? "");
       const showToast = (message, type = "info") => setToast({ message, type });
+      const pickerRef = useRef(null);
+
+      // Scroll picker to the pre-selected card whenever the selection or version list changes
+      useEffect(() => {
+        if (!pickerRef.current || !tcgCard || allVersions.length < 2) return;
+        const idx = allVersions.findIndex(c => c.id === tcgCard.id);
+        if (idx < 0) return;
+        const CARD_W = 80, GAP = 10;
+        const containerW = pickerRef.current.offsetWidth;
+        const scrollLeft = idx * (CARD_W + GAP) - (containerW / 2 - CARD_W / 2);
+        pickerRef.current.scrollTo({ left: Math.max(0, scrollLeft), behavior: "smooth" });
+      }, [tcgCard?.id, allVersions]);
 
       useEffect(() => {
         let mounted = true;
@@ -1579,7 +1591,7 @@
                 <div style={{ fontSize: 10, color: "#A1A1A1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 10 }}>
                   {allVersions.length} versions — tap the one you have
                 </div>
-                <div style={{ overflowX: "auto", display: "flex", gap: 10, paddingBottom: 4, scrollSnapType: "x mandatory" }}>
+                <div ref={pickerRef} style={{ overflowX: "auto", display: "flex", gap: 10, paddingBottom: 4, scrollSnapType: "x mandatory" }}>
                   {allVersions.map(card => {
                     const isSelected = tcgCard?.id === card.id;
                     return (
