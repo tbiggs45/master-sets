@@ -1526,7 +1526,7 @@
           setSaveSuccess(true);
           const newQty = updated.cards?.[tcgCard.id]?.quantity ?? 1;
           showToast(isDuplicate ? `Added another copy! You now have ${newQty}×` : "Card added to collection!", "info");
-          setTimeout(() => navigate("camera"), 1200);
+          setTimeout(() => navigate("scan"), 1200);
         } catch { showToast("Failed to save card — please try again", "error"); }
         finally { setSaving(false); }
       }
