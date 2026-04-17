@@ -21,10 +21,38 @@ async function readBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
+// Cache recent results to avoid redundant API calls for identical images.
+// Key: lightweight fingerprint (first+last 64 chars + length). TTL: 1 hour.
+const _resultCache = new Map();
+const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_MAX = 100;
+
+function _fingerprint(b64) {
+  const len = b64.length;
+  return `${b64.slice(0, 64)}|${b64.slice(-64)}|${len}`;
+}
+
+function _cacheGet(b64) {
+  const entry = _resultCache.get(_fingerprint(b64));
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) { _resultCache.delete(_fingerprint(b64)); return null; }
+  return entry.value;
+}
+
+function _cacheSet(b64, value) {
+  if (_resultCache.size >= CACHE_MAX) {
+    _resultCache.delete(_resultCache.keys().next().value);
+  }
+  _resultCache.set(_fingerprint(b64), { value, ts: Date.now() });
+}
+
 async function identifyCard(imageBase64) {
   if (!ANTHROPIC_API_KEY) {
     throw new Error("Server is missing ANTHROPIC_API_KEY");
   }
+
+  const cached = _cacheGet(imageBase64);
+  if (cached) return cached;
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -32,11 +60,16 @@ async function identifyCard(imageBase64) {
       "Content-Type": "application/json",
       "x-api-key": ANTHROPIC_API_KEY,
       "anthropic-version": "2023-06-01",
+      // Enables prompt caching so the static system prompt is cached server-side,
+      // cutting time-to-first-token on subsequent requests by ~1-2 s.
+      "anthropic-beta": "prompt-caching-2024-07-31",
     },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 400,
-      system: `You are a Pokemon TCG card identification assistant. Analyze the card image carefully and return ONLY a JSON object with no preamble or markdown backticks.
+      system: [{
+        type: "text",
+        text: `You are a Pokemon TCG card identification assistant. Analyze the card image carefully and return ONLY a JSON object with no preamble or markdown backticks.
 
 To identify the SET accurately:
 - The card number at the bottom (e.g. "025/191") — the TOTAL (191) is highly specific to a set
@@ -55,6 +88,8 @@ Return this exact structure:
 }
 
 If blurry or not a Pokemon card, set confidence to low and explain in notes.`,
+        cache_control: { type: "ephemeral" },
+      }],
       messages: [{
         role: "user",
         content: [
@@ -75,7 +110,9 @@ If blurry or not a Pokemon card, set confidence to low and explain in notes.`,
 
   const rawText = data.content?.find(block => block.type === "text")?.text || "";
   const clean = rawText.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
+  const result = JSON.parse(clean);
+  _cacheSet(imageBase64, result);
+  return result;
 }
 
 const server = http.createServer(async (req, res) => {
