@@ -1051,12 +1051,16 @@
     function captureFrame(videoEl) {
       const w = videoEl.videoWidth; const h = videoEl.videoHeight;
       if (!w || !h) throw new Error("Camera not ready — try again");
+      // Cap at 800 px wide to reduce payload size without losing card-text legibility.
+      const MAX_W = 800;
+      const scale = w > MAX_W ? MAX_W / w : 1;
+      const sw = Math.round(w * scale); const sh = Math.round(h * scale);
       const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
+      canvas.width = sw; canvas.height = sh;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Could not capture frame");
-      ctx.drawImage(videoEl, 0, 0);
-      return canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
+      ctx.drawImage(videoEl, 0, 0, sw, sh);
+      return canvas.toDataURL("image/jpeg", 0.75).split(",")[1];
     }
 
     // ── UI Components ─────────────────────────────────────────────────────────
@@ -1294,7 +1298,7 @@
         identifyingRef.current = true;
         setIdentifying(true); setIdentifyError(null);
 
-        // Safety-net: force reset UI if nothing resolves within 35 s
+        // Safety-net: force reset UI if nothing resolves within 30 s (matches backend timeout)
         const safetyTimer = setTimeout(() => {
           if (!mountedRef.current) return;
           identifyingRef.current = false;
@@ -1305,7 +1309,7 @@
           setStream(s => { if (s) s.getTracks().forEach(t => t.stop()); return null; });
           setCameraReady(false);
           startCamera();
-        }, 35000);
+        }, 30000);
 
         try {
           const visionResult = await identifyCardWithVision(base64);
