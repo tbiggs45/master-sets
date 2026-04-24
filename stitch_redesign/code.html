@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Master Sets - Card Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-background": "#FFFFFF",
+                    "tertiary-container": "#30D158",
+                    "on-primary-container": "#FFFFFF",
+                    "primary-container": "#E3350D",
+                    "on-secondary-container": "#FFFFFF",
+                    "on-primary": "#FFFFFF",
+                    "on-tertiary-fixed": "#002107",
+                    "surface-container": "#1f1f21",
+                    "surface-dim": "#131315",
+                    "on-tertiary-fixed-variant": "#00531c",
+                    "tertiary-fixed-dim": "#30D158",
+                    "inverse-primary": "#E3350D",
+                    "secondary-fixed-dim": "#30D158",
+                    "on-surface": "#FFFFFF",
+                    "on-surface-variant": "#A1A1A1",
+                    "surface": "#131315",
+                    "background": "#000000",
+                    "on-secondary": "#FFFFFF",
+                    "on-secondary-fixed-variant": "#4a4900",
+                    "secondary": "#30D158",
+                    "tertiary-fixed": "#30D158",
+                    "on-tertiary": "#FFFFFF",
+                    "on-primary-fixed-variant": "#E3350D",
+                    "surface-container-low": "#1C1C1E",
+                    "on-primary-fixed": "#E3350D",
+                    "inverse-on-surface": "#303032",
+                    "primary-fixed": "#E3350D",
+                    "surface-variant": "#1C1C1E",
+                    "on-error-container": "#ffdad6",
+                    "secondary-container": "#30D158",
+                    "surface-bright": "#39393b",
+                    "tertiary": "#30D158",
+                    "on-tertiary-container": "#FFFFFF",
+                    "primary-fixed-dim": "#E3350D",
+                    "surface-tint": "#E3350D",
+                    "error": "#FF453A",
+                    "outline-variant": "#3A3A3C",
+                    "primary": "#E3350D",
+                    "outline": "#48484A",
+                    "inverse-surface": "#FFFFFF",
+                    "error-container": "#93000a",
+                    "surface-container-high": "#2C2C2E",
+                    "on-error": "#FFFFFF",
+                    "secondary-fixed": "#30D158",
+                    "on-secondary-fixed": "#FFFFFF",
+                    "surface-container-highest": "#3A3A3C",
+                    "surface-container-lowest": "#000000"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000000;
+            color: #FFFFFF;
+        }
+        .glass-header {
+            background: rgba(28, 28, 30, 0.8);
+            backdrop-filter: blur(20px);
+        }
+        .card-glow {
+            box-shadow: 0 0 60px -15px rgba(227, 53, 13, 0.2);
+        }
+        .apple-green-text {
+            color: #30D158;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+    </style>
+</head>
+<body class="bg-background min-h-screen flex flex-col pb-32">
+<!-- Top Navigation Anchor -->
+<header class="fixed top-0 w-full z-50 flex items-center justify-between px-6 h-20 bg-surface-variant/80 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<button class="hover:bg-[#2C2C2E] transition-colors duration-300 p-2 rounded-full active:opacity-80 transition-all scale-95">
+<span class="material-symbols-outlined text-on-surface">arrow_back</span>
+</button>
+<h1 class="text-on-surface font-black tracking-tighter text-2xl uppercase">Master Sets</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary">filter_list</span>
+<div class="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant">
+<img alt="Profile" class="w-full h-full object-cover" data-alt="Close up portrait of a professional collector with soft studio lighting and dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEt8p1LbuUCAMYF3DMs0vOKbPMc_YQHVsbGQZrgbbRlXjNRxac1tJyOKAtq79RxUR5GI9Rei88AS4KYrgKUaLjSLJYYYX9vSXij1j3Zbime_rX8uiaV0tiUttRwa_CCkS7bzWWC97FxEGRWURN893jplt_eEwPIV2j6lbgsK0HCjDoSUEdYMxALPEU1uwdcKam3-TD3eshoaKgqhDww1nhbIzUaR60j_Uh0eUJqk6DrhVnVstzUba78BqD2pLDL7qEStCRqtt3AobL"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="mt-24 px-6 flex flex-col items-center max-w-4xl mx-auto w-full">
+<!-- Hero Card View -->
+<section class="relative w-full flex justify-center py-12">
+<!-- Decorative Background Glow -->
+<div class="absolute inset-0 bg-primary/10 blur-[120px] rounded-full scale-75 pointer-events-none"></div>
+<div class="relative group">
+<div class="card-glow rounded-lg transition-transform duration-500 hover:scale-[1.02]">
+<img alt="Metapod Surging Sparks" class="w-[320px] md:w-[420px] rounded-lg shadow-2xl" data-alt="High quality holographic collectible trading card featuring a green insect creature in a mystical forest setting with vibrant colors" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDa8z5wvyqdy50EiN0qcYCv2e6Yd-G3EDzG7Ii0JW4hOxXitvxEoQfQVlN3KOYEn4LUIwqtgkdjidmVxgHITcWCT_2becwp2ia0yrjvqyCgliVDcuDQlKiJRekYsDpIjmwNlDkE_7CE84SOUwQXR2LbKLF3hnHeU9QbK1iVb65zoyI8z7sXp_oJjvn6Gn279ILLCSb3Auykk4qpEOhZmRDLNFImumWJQhyL5AIMrJ0TMVJWQjKwD5iUZ4N18DU2ImmeR9GfiNoD9k78"/>
+</div>
+</div>
+</section>
+<!-- Metadata Section -->
+<section class="w-full text-center space-y-8">
+<div class="space-y-2">
+<p class="text-primary font-['Inter'] text-[12px] font-bold tracking-widest uppercase">Surging Sparks — 002/191</p>
+<h2 class="text-on-background text-5xl md:text-7xl font-black tracking-tighter leading-tight">Metapod</h2>
+<div class="flex items-center justify-center gap-3">
+<span class="px-3 py-1 bg-surface-container-high rounded-full text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Uncommon</span>
+<span class="px-3 py-1 bg-surface-container-high rounded-full text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Grass Type</span>
+</div>
+</div>
+<!-- Market Value -->
+<div class="bg-surface-container-low p-8 rounded-2xl flex flex-col items-center gap-2 border border-outline-variant">
+<span class="text-on-surface-variant text-[10px] font-bold tracking-[0.2em] uppercase">Market Value</span>
+<div class="flex items-baseline gap-1">
+<span class="apple-green-text text-6xl md:text-8xl font-black tracking-tighter">$12.45</span>
+</div>
+<div class="flex items-center gap-2 apple-green-text font-bold text-sm">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span>+14.2% (7d)</span>
+</div>
+</div>
+<!-- Actions -->
+<div class="grid grid-cols-2 gap-4 w-full max-w-md mx-auto">
+<button class="bg-primary text-on-primary h-16 rounded-full font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined">add</span>
+                Add Copy
+            </button>
+<button class="bg-surface-container-high text-on-surface h-16 rounded-full font-bold flex items-center justify-center gap-2 active:scale-95 transition-all border border-outline-variant">
+<span class="material-symbols-outlined">remove</span>
+                Remove
+            </button>
+</div>
+</section>
+<!-- Technical Details -->
+<section class="w-full mt-16 grid grid-cols-1 md:grid-cols-3 gap-4 mb-20">
+<div class="bg-surface-container-low p-6 rounded-2xl flex flex-col gap-4 border border-outline-variant">
+<span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Population</span>
+<div class="text-3xl font-black text-on-surface">1,429</div>
+<p class="text-xs text-on-surface-variant leading-relaxed">Copies currently tracked in Master Sets global vaults.</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-2xl flex flex-col gap-4 border border-outline-variant">
+<span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Last Sale</span>
+<div class="text-3xl font-black apple-green-text">$11.90</div>
+<p class="text-xs text-on-surface-variant leading-relaxed">Recorded 4 hours ago on TCGPlayer Marketplace.</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-2xl flex flex-col gap-4 border border-outline-variant">
+<span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Set Progress</span>
+<div class="text-3xl font-black text-on-surface">84%</div>
+<div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[84%]"></div>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Shell -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pt-3 pb-8 bg-surface-variant/90 backdrop-blur-md z-50 rounded-t-[2.5rem] border-t border-outline-variant">
+<!-- Home -->
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all tap-highlight-transparent active:scale-90 transition-transform cursor-pointer">
+<span class="material-symbols-outlined">home_storage</span>
+<span class="font-['Inter'] text-[10px] font-bold tracking-widest uppercase mt-1">Home</span>
+</div>
+<!-- Binder (Active) -->
+<div class="flex flex-col items-center justify-center bg-primary text-on-primary rounded-full px-6 py-1.5 transition-all tap-highlight-transparent active:scale-90 transition-transform cursor-pointer shadow-lg shadow-primary/30">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">auto_stories</span>
+<span class="font-['Inter'] text-[10px] font-bold tracking-widest uppercase mt-1">Binder</span>
+</div>
+<!-- Scan (Primary Action) -->
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all tap-highlight-transparent active:scale-90 transition-transform cursor-pointer">
+<div class="w-12 h-12 bg-surface-container-highest rounded-full flex items-center justify-center mb-1 -mt-4 border border-outline-variant shadow-lg">
+<span class="material-symbols-outlined text-on-surface">photo_camera</span>
+</div>
+<span class="font-['Inter'] text-[10px] font-bold tracking-widest uppercase">Scan</span>
+</div>
+<!-- Search -->
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all tap-highlight-transparent active:scale-90 transition-transform cursor-pointer">
+<span class="material-symbols-outlined">search</span>
+<span class="font-['Inter'] text-[10px] font-bold tracking-widest uppercase mt-1">Search</span>
+</div>
+<!-- Profile -->
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all tap-highlight-transparent active:scale-90 transition-transform cursor-pointer">
+<span class="material-symbols-outlined">person</span>
+<span class="font-['Inter'] text-[10px] font-bold tracking-widest uppercase mt-1">Profile</span>
+</div>
+</nav>
+</body></html>
