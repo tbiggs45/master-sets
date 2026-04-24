@@ -1,0 +1,12 @@
+{
+  "name": "master-sets-scan",
+  "version": "1.0.0",
+  "description": "Master Sets card scan backend — proxies card images to Anthropic Vision",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

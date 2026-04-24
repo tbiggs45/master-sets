@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Digital Vault | Master Sets</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary": "#ecb1ff",
+                    "inverse-surface": "#e1e2e7",
+                    "secondary-fixed": "#dfed00",
+                    "surface-container-high": "#282a2e",
+                    "on-tertiary-fixed-variant": "#75009e",
+                    "on-error": "#690005",
+                    "primary-fixed": "#ffdad5",
+                    "error-container": "#93000a",
+                    "tertiary-fixed-dim": "#ecb1ff",
+                    "on-tertiary-fixed": "#320046",
+                    "on-secondary": "#2f3300",
+                    "on-surface-variant": "#d5c0d7",
+                    "surface-bright": "#37393d",
+                    "on-surface": "#e1e2e7",
+                    "secondary-container": "#dfed00",
+                    "primary-fixed-dim": "#ffb4aa",
+                    "on-tertiary": "#520070",
+                    "surface-variant": "#323539",
+                    "inverse-primary": "#c0000a",
+                    "surface-container-lowest": "#0c0e12",
+                    "outline-variant": "#514254",
+                    "primary-container": "#ee0311",
+                    "error": "#ffb4ab",
+                    "surface-container": "#1d2023",
+                    "on-primary-container": "#ffffff",
+                    "on-error-container": "#ffdad6",
+                    "on-secondary-container": "#636900",
+                    "primary": "#ffb4aa",
+                    "on-tertiary-container": "#ffffff",
+                    "secondary": "#ffffff",
+                    "surface-container-highest": "#323539",
+                    "surface-container-low": "#191c1f",
+                    "on-secondary-fixed": "#1b1d00",
+                    "tertiary-fixed": "#f9d8ff",
+                    "on-secondary-fixed-variant": "#464a00",
+                    "surface-tint": "#ffb4aa",
+                    "background": "#05070a",
+                    "tertiary-container": "#bf00ff",
+                    "outline": "#9d8ba0",
+                    "secondary-fixed-dim": "#c3d000",
+                    "on-primary-fixed-variant": "#930005",
+                    "inverse-on-surface": "#2e3134",
+                    "on-primary": "#690003",
+                    "on-background": "#e1e2e7",
+                    "surface": "#05070a",
+                    "surface-dim": "#05070a",
+                    "on-primary-fixed": "#410001"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Manrope"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { 
+            background: radial-gradient(circle at 50% -20%, #0a0f2b 0%, #05070a 100%);
+            color: #e1e2e7; 
+            font-family: 'Inter', sans-serif; 
+            overflow-x: hidden;
+        }
+        
+        .vault-glass {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(40px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.03);
+        }
+
+        .text-glow-yellow { 
+            text-shadow: 0 0 20px rgba(223, 237, 0, 0.4), 0 0 40px rgba(223, 237, 0, 0.1); 
+            animation: pulse-glow 3s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            from { opacity: 0.8; filter: drop-shadow(0 0 5px rgba(223, 237, 0, 0.3)); }
+            to { opacity: 1; filter: drop-shadow(0 0 25px rgba(223, 237, 0, 0.6)); }
+        }
+
+        .card-aura {
+            filter: drop-shadow(0 0 40px rgba(191, 0, 255, 0.35));
+            animation: aura-breathe 4s infinite ease-in-out;
+        }
+
+        @keyframes aura-breathe {
+            0%, 100% { filter: drop-shadow(0 0 30px rgba(191, 0, 255, 0.2)); }
+            50% { filter: drop-shadow(0 0 60px rgba(191, 0, 255, 0.5)); }
+        }
+
+        .shimmer-effect {
+            position: relative;
+            overflow: hidden;
+        }
+        .shimmer-effect::after {
+            content: '';
+            position: absolute;
+            inset: -50%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.1) 50%, transparent 55%);
+            animation: shimmer 6s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%) translateY(-100%); }
+            20%, 100% { transform: translateX(100%) translateY(100%); }
+        }
+
+        .particles-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: float-particles 100s linear infinite;
+        }
+
+        @keyframes float-particles {
+            from { background-position: 0 0; }
+            to { background-position: 500px 1000px; }
+        }
+
+        .nav-active {
+            background: linear-gradient(135deg, #ffb4aa 0%, #ee0311 100%);
+            box-shadow: 0 0 20px rgba(238, 3, 17, 0.4);
+        }
+    </style>
+<style>
+        body { min-height: max(884px, 100dvh); }
+    </style>
+</head>
+<body class="min-h-screen pb-32">
+<div class="particles-bg"></div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-transparent backdrop-blur-2xl border-b border-white/5">
+<div class="flex justify-between items-center px-6 py-4 w-full">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#ffb4aa] hover:opacity-80 transition-opacity cursor-pointer">menu</span>
+<h1 class="text-xl font-bold tracking-[0.3em] text-[#e1e2e7] font-['Space_Grotesk'] uppercase text-xs">DIGITAL VAULT</h1>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex items-center gap-8 font-['Space_Grotesk'] text-[10px] tracking-[0.4em] uppercase font-bold text-on-surface-variant">
+<a class="text-[#dfed00] hover:text-white transition-colors" href="#">System</a>
+<a class="hover:text-white transition-colors" href="#">Vault</a>
+<a class="hover:text-white transition-colors" href="#">Terminal</a>
+</div>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-[#dfed00]/30 p-0.5">
+<img alt="User Avatar" class="w-full h-full rounded-full object-cover" data-alt="professional male portrait with soft studio lighting and dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMQFhyQ4NYly9iaUCai1sOgQr2THV1Y6IQykHwfIt0urERxvsxrZ6qOo17uwBUZ6M8siau9pI9GPL5qL2IXaicczS-XRWDbnU8zwGDzYnxLryIH-TRPmzLLyNKqHgxYzAVCMn-eJnh1mr5I6sAGHwVaubqq3AzTdrINuCZwDVloMa3NMoHOWnzzUHFTafr86VO-NZrUoDB-qvVXhOu0u3s3AwCIAVCSD7qLl-WZ53AnrBhJug2DZpBIMvnHWv7e4q6NEa37ffUgxcz"/>
+</div>
+</div>
+</div>
+</header>
+<main class="pt-28 px-6 max-w-7xl mx-auto space-y-12">
+<!-- Dashboard Section -->
+<section class="grid grid-cols-1 md:grid-cols-4 gap-6">
+<!-- Total Value (Bento Large) -->
+<div class="md:col-span-2 vault-glass rounded-3xl p-8 flex flex-col justify-between relative overflow-hidden group">
+<div class="absolute -top-12 -right-12 p-8 opacity-[0.03] group-hover:opacity-10 transition-opacity pointer-events-none">
+<span class="material-symbols-outlined text-[15rem]">shield</span>
+</div>
+<div>
+<p class="font-['Manrope'] text-[10px] uppercase tracking-[0.4em] text-on-surface-variant/60 mb-2">Portfolio Net Asset Value</p>
+<h2 class="font-['Space_Grotesk'] text-5xl md:text-7xl font-bold text-secondary-fixed text-glow-yellow tracking-tighter">$42,850.24</h2>
+<div class="flex items-center gap-2 mt-4">
+<span class="material-symbols-outlined text-[#39FF14] text-xs">trending_up</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase tracking-widest text-[#39FF14]">+12.4% Variance</span>
+</div>
+</div>
+<div class="mt-8 flex gap-4">
+<button class="bg-[#dfed00] text-black px-6 py-3 rounded-full font-['Space_Grotesk'] font-bold text-[10px] uppercase tracking-[0.2em] hover:scale-105 transition-all shadow-[0_0_20px_rgba(223,237,0,0.3)]">Deep Analysis</button>
+</div>
+</div>
+<!-- Completion (Bento Square) -->
+<div class="vault-glass rounded-3xl p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
+<div class="relative w-36 h-36 mb-4">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="45" stroke="rgba(255,255,255,0.05)" stroke-width="6"></circle>
+<circle cx="50" cy="50" fill="none" r="45" stroke="url(#progress-gradient)" stroke-dasharray="210" stroke-dashoffset="60" stroke-linecap="round" stroke-width="6"></circle>
+<defs>
+<lineargradient id="progress-gradient" x1="0%" x2="100%" y1="0%" y2="0%">
+<stop offset="0%" stop-color="#ee0311"></stop>
+<stop offset="100%" stop-color="#dfed00"></stop>
+</lineargradient>
+</defs>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-['Space_Grotesk'] text-3xl font-bold tracking-tighter">78%</span>
+<span class="font-['Manrope'] text-[8px] uppercase tracking-[0.3em] text-on-surface-variant">Global Sync</span>
+</div>
+</div>
+<p class="font-['Space_Grotesk'] text-[10px] uppercase tracking-[0.2em] font-bold text-on-surface-variant/80">Vault Completion</p>
+</div>
+<!-- Quick Stats (Bento Square) -->
+<div class="vault-glass rounded-3xl p-8 space-y-6">
+<div class="flex justify-between items-center border-b border-white/5 pb-3">
+<span class="font-['Manrope'] text-[9px] uppercase tracking-widest text-on-surface-variant/60">Registry</span>
+<span class="font-['Space_Grotesk'] text-lg font-bold">3,241</span>
+</div>
+<div class="flex justify-between items-center border-b border-white/5 pb-3">
+<span class="font-['Manrope'] text-[9px] uppercase tracking-widest text-on-surface-variant/60">Classified</span>
+<span class="font-['Space_Grotesk'] text-lg font-bold text-tertiary">42</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-['Manrope'] text-[9px] uppercase tracking-widest text-on-surface-variant/60">Pristine 10</span>
+<span class="font-['Space_Grotesk'] text-lg font-bold text-secondary-fixed">158</span>
+</div>
+<div class="pt-2">
+<div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-tertiary to-primary-container w-2/3"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Series Progress Tracking -->
+<section class="space-y-6">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+<div>
+<h3 class="font-['Space_Grotesk'] text-xl font-bold tracking-[0.3em] uppercase">Active Archives</h3>
+<p class="font-['Inter'] text-on-surface-variant/60 text-xs mt-1">Real-time market valuation and collection integrity tracking.</p>
+</div>
+<div class="w-full md:w-auto">
+<div class="vault-glass rounded-full px-6 py-3 flex items-center gap-3">
+<span class="material-symbols-outlined text-sm text-on-surface-variant/60">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-[10px] font-['Space_Grotesk'] uppercase tracking-[0.2em] w-full md:w-48 placeholder:text-on-surface-variant/30" placeholder="Scan Database..." type="text"/>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Series Panel 1 -->
+<div class="vault-glass rounded-3xl p-8 relative overflow-hidden group cursor-pointer hover:border-secondary-fixed/30 transition-all">
+<div class="absolute -right-8 -bottom-8 opacity-[0.04] group-hover:opacity-10 transition-opacity">
+<img alt="Set Logo Watermark" class="w-64 h-64 object-contain grayscale invert" data-alt="faint watermark of a mythical fire dragon creature silhouette on dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-rzKWVXn9Cibsr_Y0brWOzM30OJqm1xYSv06FtE81G6bKSfRM_Gcuuq228U2Ib8S2E90EtY4vHc6C4DWng4ubAwsXei-0rosy5KZJh9gBtc_LwYuMBAXs8SW0MYrfJUkUim-3Wuv6PX9eLO8O7lK0WdMUx22UfetnIgATjmxDMpTWNqVzZiMNCsv3k36IQx6B96Wbyxd7rORJD6upZiPTZrJprp6TDUigOcE8cprShOKV681Ni5ShQsuS7X1DnLbAGHffZy1MuqNE"/>
+</div>
+<div class="relative z-10 space-y-6">
+<div class="flex justify-between items-start">
+<div>
+<span class="border border-secondary-fixed/30 text-secondary-fixed text-[8px] px-3 py-1 rounded-full font-bold uppercase tracking-[0.3em] mb-3 inline-block">S&amp;V: GENESIS</span>
+<h4 class="font-['Space_Grotesk'] text-2xl font-bold tracking-tight">151 Special Set</h4>
+</div>
+<div class="text-right">
+<p class="font-['Space_Grotesk'] text-lg font-bold">145 / 151</p>
+<p class="font-['Manrope'] text-[8px] uppercase tracking-widest text-on-surface-variant">96% Integrality</p>
+</div>
+</div>
+<div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-[#ee0311] via-[#dfed00] to-[#39FF14] w-[96%]"></div>
+</div>
+<div class="flex gap-10 pt-2">
+<div>
+<p class="font-['Manrope'] text-[8px] uppercase tracking-widest text-on-surface-variant mb-1">Asset Value</p>
+<p class="font-['Space_Grotesk'] text-xl font-bold text-secondary-fixed tracking-tight">$2,450</p>
+</div>
+<div>
+<p class="font-['Manrope'] text-[8px] uppercase tracking-widest text-on-surface-variant mb-1">Gap Analysis</p>
+<p class="font-['Space_Grotesk'] text-xl font-bold tracking-tight">06 Units</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Series Panel 2 -->
+<div class="vault-glass rounded-3xl p-8 relative overflow-hidden group cursor-pointer hover:border-tertiary/30 transition-all">
+<div class="absolute -right-8 -bottom-8 opacity-[0.04] group-hover:opacity-10 transition-opacity">
+<img alt="Set Logo Watermark" class="w-64 h-64 object-contain grayscale invert" data-alt="faint watermark of a lightning electric mouse creature silhouette on dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDty-7vRC2YAmz1grUjCZIKs0h5p-C3n5_ML6uPCkLGGIyzX4Hh5XqKcF3pLtSAgxc_T9SsahM1LPWToQxEvP_BJ6vtjtHXg6COhwFtk1hGwcfi5HbNb4qwnVBHO1cvd0cnkZRIJyeZS3Y0X6uRcWhotrGzDjPuLxqDpuGzB3lh2X3ZvmFzAeH77nQsnR5RdDDOHnbBaELEpqOqFjBwRz9CFybO_iGp5hg1rWDBCkO66lol4SoVglwWFOctlY5nnTOXzFpuam7QdmzN"/>
+</div>
+<div class="relative z-10 space-y-6">
+<div class="flex justify-between items-start">
+<div>
+<span class="border border-tertiary/30 text-tertiary text-[8px] px-3 py-1 rounded-full font-bold uppercase tracking-[0.3em] mb-3 inline-block">PALDEA EVOLVED</span>
+<h4 class="font-['Space_Grotesk'] text-2xl font-bold tracking-tight">Paldea Evolved</h4>
+</div>
+<div class="text-right">
+<p class="font-['Space_Grotesk'] text-lg font-bold">192 / 279</p>
+<p class="font-['Manrope'] text-[8px] uppercase tracking-widest text-on-surface-variant">68% Integrality</p>
+</div>
+</div>
+<div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-[#ee0311] via-[#dfed00] to-[#39FF14] w-[68%]"></div>
+</div>
+<div class="flex gap-10 pt-2">
+<div>
+<p class="font-['Manrope'] text-[8px] uppercase tracking-widest text-on-surface-variant mb-1">Asset Value</p>
+<p class="font-['Space_Grotesk'] text-xl font-bold text-secondary-fixed tracking-tight">$1,120</p>
+</div>
+<div>
+<p class="font-['Manrope'] text-[8px] uppercase tracking-widest text-on-surface-variant mb-1">Gap Analysis</p>
+<p class="font-['Space_Grotesk'] text-xl font-bold tracking-tight">87 Units</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Card Detail Section (The Museum Piece) -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center py-20 relative">
+<div class="absolute inset-0 bg-gradient-to-b from-transparent via-tertiary/5 to-transparent -z-10 blur-3xl"></div>
+<!-- Hero Card Container -->
+<div class="flex justify-center relative group">
+<div class="card-aura absolute inset-0 bg-tertiary/20 blur-[120px] rounded-full scale-90"></div>
+<div class="relative z-10 p-1.5 rounded-[2.5rem] bg-white/5 border border-white/20 shadow-2xl shimmer-effect">
+<img alt="Charizard ex Card" class="w-80 md:w-96 rounded-[2rem] shadow-2xl relative z-20" data-alt="highly detailed pokemon card of a fire dragon breathing blue flames with intricate etched patterns and holographic shine" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAU_sJH1H5lbroCvCasjNux2T8uxj3l2ODS_f6NbUZGFX-vl62LS9eoRRzoqW4tfamG_Q46pZrEo7uIakcG6dGTYs69u6sjcxMXffQDdrWhaPqYxozHRUF_dXoIVAkrhstYRD4NrMeJHuVZ9sS4P_z4_lW_gnH3x1xXRzsQ1OK6p9XO30BTZNc40Dk4RqIqV9z10knQRHLXUzadU7xJyuKMbHyn-jcs0cvZ2bvAwlrGnCQ61NiafLwyA5oZ8MH7-c_vtb-WGkI1zddx"/>
+</div>
+</div>
+<!-- Card Info Container -->
+<div class="space-y-10">
+<div>
+<div class="flex flex-wrap items-center gap-3 mb-6">
+<span class="bg-tertiary/10 border border-tertiary/40 text-tertiary text-[9px] px-4 py-1.5 rounded-full font-bold uppercase tracking-[0.3em]">Special Illustration Rare</span>
+<span class="text-on-surface-variant/60 font-['Space_Grotesk'] text-[10px] uppercase tracking-widest">Archive ID: OF-223</span>
+</div>
+<h3 class="font-['Space_Grotesk'] text-6xl font-bold leading-none mb-4 tracking-tighter">Charizard ex</h3>
+<div class="flex items-baseline gap-3">
+<p class="font-['Space_Grotesk'] text-5xl text-secondary-fixed font-bold tracking-tight text-glow-yellow">$342.50</p>
+<span class="text-[#39FF14] text-[10px] font-bold font-['Space_Grotesk'] uppercase tracking-[0.2em]">+5.2% Trend</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="vault-glass p-6 rounded-2xl border-l-2 border-l-secondary-fixed">
+<p class="font-['Manrope'] text-[8px] uppercase tracking-widest text-on-surface-variant/60 mb-2">Authenticated Grade</p>
+<p class="font-['Space_Grotesk'] text-xl font-bold tracking-tight">GEM MINT 10</p>
+</div>
+<div class="vault-glass p-6 rounded-2xl">
+<p class="font-['Manrope'] text-[8px] uppercase tracking-widest text-on-surface-variant/60 mb-2">Global Population</p>
+<p class="font-['Space_Grotesk'] text-xl font-bold tracking-tight">452 Verified</p>
+</div>
+<div class="vault-glass p-6 rounded-2xl col-span-2 flex justify-between items-center">
+<div>
+<p class="font-['Manrope'] text-[8px] uppercase tracking-widest text-on-surface-variant/60 mb-2">Valuation History</p>
+<div class="flex items-center gap-2">
+<p class="font-['Space_Grotesk'] text-2xl font-bold tracking-tighter text-white">Bullish</p>
+</div>
+</div>
+<div class="flex items-end gap-1 h-10">
+<div class="w-2.5 bg-white/5 h-1/3 rounded-t-sm"></div>
+<div class="w-2.5 bg-white/10 h-2/3 rounded-t-sm"></div>
+<div class="w-2.5 bg-white/20 h-1/2 rounded-t-sm"></div>
+<div class="w-2.5 bg-white/40 h-3/4 rounded-t-sm"></div>
+<div class="w-2.5 bg-secondary-fixed h-full rounded-t-sm shadow-[0_0_10px_rgba(223,237,0,0.5)]"></div>
+</div>
+</div>
+</div>
+<div class="flex gap-4">
+<button class="flex-1 bg-white text-black py-5 rounded-full font-['Space_Grotesk'] font-bold text-[10px] uppercase tracking-[0.3em] hover:bg-secondary-fixed transition-colors">Add to Security Watchlist</button>
+<button class="p-5 vault-glass rounded-full hover:bg-white/10 transition-all group">
+<span class="material-symbols-outlined group-hover:rotate-12 transition-transform">share</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Recent Acquisitions -->
+<section class="space-y-8 pb-10">
+<div class="flex justify-between items-end">
+<h3 class="font-['Space_Grotesk'] text-xl font-bold tracking-[0.3em] uppercase">Latest Archive Sync</h3>
+<button class="text-[9px] uppercase tracking-[0.3em] text-on-surface-variant hover:text-white transition-colors">Full Inventory</button>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+<!-- Card Item -->
+<div class="group cursor-pointer">
+<div class="relative mb-4 aspect-[3/4] rounded-2xl overflow-hidden vault-glass p-1 transition-all duration-500 group-hover:p-0">
+<img alt="Card Thumbnail" class="w-full h-full object-cover rounded-xl transition-all duration-700 group-hover:scale-110" data-alt="pokemon card featuring a yellow electric mouse with lightning bolt background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFW8-7g7YGQw8K1Ff5II6WKkPkD26MWQigGUecguzQ6UVOVPoM_ZAPN27GWFPFMN_OCZLeSbS718V-BxcAN_UhCBQBhD9Yi4Fep9c5aF_0IMSZPVbRtDHa229e1xVbB93iA248Y74UhzizJSWg7Kzd5nQuQbheIYC6F8EOsT8aGu-QQDIQ84NhrJ42mSUrlejYfLKGySjkh5_WZCaUQ9-4_qKwYteRiw2NYj5m1nbZoR5v5lJ305sWufhkUiZlmyWYmaKucj3_tWQW"/>
+<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+<span class="text-[8px] font-['Space_Grotesk'] font-bold uppercase tracking-[0.3em] border border-white/30 px-4 py-2 rounded-full">Examine</span>
+</div>
+</div>
+<p class="font-['Space_Grotesk'] font-bold text-[10px] tracking-widest uppercase truncate">Pikachu VMAX</p>
+<p class="font-['Space_Grotesk'] text-[10px] text-secondary-fixed font-bold">$158.00</p>
+</div>
+<!-- Card Item -->
+<div class="group cursor-pointer">
+<div class="relative mb-4 aspect-[3/4] rounded-2xl overflow-hidden vault-glass p-1 transition-all duration-500 group-hover:p-0">
+<img alt="Card Thumbnail" class="w-full h-full object-cover rounded-xl transition-all duration-700 group-hover:scale-110" data-alt="pokemon card featuring a purple psychic creature with floating elements" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDps5woeaI1e4RS_54HYxL-MwYd1oykNefw_0WrpkzEchC9CZlxirCsUpThpP76mps7JprTleNAdO_bwy5ZZdCjoei0kVAS3egI5szEThKc9ofBmzIRZipZfDa0vyBtN_H0f73Akcb7PxZis3HwZJHMBtnjc_wT0sdmq8sVEfBBDYVTkHXspP4qAZuxwMinf8u1UtuZfTiv24Nv2IF9fWtzo7NLJk6YDcVQOMZ3mR1FC4YzabvJId2Q3GnUll3t99Rzl40TpmSISc6O"/>
+<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+<span class="text-[8px] font-['Space_Grotesk'] font-bold uppercase tracking-[0.3em] border border-white/30 px-4 py-2 rounded-full">Examine</span>
+</div>
+</div>
+<p class="font-['Space_Grotesk'] font-bold text-[10px] tracking-widest uppercase truncate">Mewtwo GX</p>
+<p class="font-['Space_Grotesk'] text-[10px] text-secondary-fixed font-bold">$89.50</p>
+</div>
+<!-- Card Item -->
+<div class="group cursor-pointer">
+<div class="relative mb-4 aspect-[3/4] rounded-2xl overflow-hidden vault-glass p-1 transition-all duration-500 group-hover:p-0">
+<img alt="Card Thumbnail" class="w-full h-full object-cover rounded-xl transition-all duration-700 group-hover:scale-110" data-alt="pokemon card featuring a green leaf dragon creature in a jungle setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtDlUbhYp-DcfNXKncMzKAjcIbNN-jjXFA1lkFTkCqI4dAGg2YI5xa9qYRFMooVv87yo2k4HMr3PH13N41rk98Yda2cUygcQtz9lQ0aU9H7EXpvCMPf5SlFcMye7zxkg3OeZ-IBST6nAFHYnU4eAqJSs6xyIKuuJdnI1jCCoW6SGElB4d3aW-Ku5y4PvMV3viq_qGroELzAAbdxWES4xa_kvD4B-G4uHeb0HdfzkiWvtR3wVIQEi_KHwlEZBaJJ3uIUVJYfPB2Murr"/>
+<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+<span class="text-[8px] font-['Space_Grotesk'] font-bold uppercase tracking-[0.3em] border border-white/30 px-4 py-2 rounded-full">Examine</span>
+</div>
+</div>
+<p class="font-['Space_Grotesk'] font-bold text-[10px] tracking-widest uppercase truncate">Rayquaza V</p>
+<p class="font-['Space_Grotesk'] text-[10px] text-secondary-fixed font-bold">$212.00</p>
+</div>
+<!-- Card Item -->
+<div class="group cursor-pointer">
+<div class="relative mb-4 aspect-[3/4] rounded-2xl overflow-hidden vault-glass p-1 transition-all duration-500 group-hover:p-0">
+<img alt="Card Thumbnail" class="w-full h-full object-cover rounded-xl transition-all duration-700 group-hover:scale-110" data-alt="pokemon card featuring a blue water creature with ice crystals" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJcyxNMJgTGcSIZ4pGUYNlVGNBBnkALtA5boDgIJ2juIhsZurqQmtfBVJaTKaTmGt46sXKS2Ntn9m6GgnzBkEIfGyge5kd9vEoTmzq9uHrd0hqOSfw9jgBgOV6ThobdSllGJ7pe0FTnOQ-c1A96J3mwdEuhSyzgYGcZdF9y-JyrYfqPrseEM3HDZdKGN2vS4Ghgmp75oc7SPp5l_Sz_AhdMZYMMtO3GI_uRa1oCfaGkCZUVVMe-mZ9auWmCrS-osIWQFU7G2tw-0CI"/>
+<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+<span class="text-[8px] font-['Space_Grotesk'] font-bold uppercase tracking-[0.3em] border border-white/30 px-4 py-2 rounded-full">Examine</span>
+</div>
+</div>
+<p class="font-['Space_Grotesk'] font-bold text-[10px] tracking-widest uppercase truncate">Glaceon VSTAR</p>
+<p class="font-['Space_Grotesk'] text-[10px] text-secondary-fixed font-bold">$45.00</p>
+</div>
+<!-- Card Item -->
+<div class="group cursor-pointer">
+<div class="relative mb-4 aspect-[3/4] rounded-2xl overflow-hidden vault-glass p-1 transition-all duration-500 group-hover:p-0">
+<img alt="Card Thumbnail" class="w-full h-full object-cover rounded-xl transition-all duration-700 group-hover:scale-110" data-alt="pokemon card featuring a dark shadow creature with glowing red eyes" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDG9nlKXhm8tO1IhiiMllCot7yChuyF3pQbCLAaihxpfXn_QalwTCdv1gykzr8-8z8vls2TQdDlvFzGc9oBIw36oQS_o3zzXf7rOwjjmFaXH7z3D0ACtf74Rn9ZzV2nqQsHyhJCe57HyB-dGXZ37pCobDCqZDZUFwIXsqxIuOcudroWeuSd0MnsiZVnJh0WZvy6jMnmUMrgDiSnwDM6sRfNusLifoq7HUpe90Ju9ugBsY0x8MKxcx7OBnPP1QBkH-UooWiHPQtIy1RM"/>
+<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+<span class="text-[8px] font-['Space_Grotesk'] font-bold uppercase tracking-[0.3em] border border-white/30 px-4 py-2 rounded-full">Examine</span>
+</div>
+</div>
+<p class="font-['Space_Grotesk'] font-bold text-[10px] tracking-widest uppercase truncate">Umbreon VMAX</p>
+<p class="font-['Space_Grotesk'] text-[10px] text-secondary-fixed font-bold">$620.00</p>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-8 left-0 right-0 z-50 flex justify-center items-center px-4">
+<div class="flex justify-around items-center px-6 w-[95%] max-w-md rounded-full border border-white/10 bg-[#05070a]/60 backdrop-blur-3xl py-3 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)]">
+<div class="nav-active text-white rounded-full p-3.5 flex flex-col items-center cursor-pointer scale-110">
+<span class="material-symbols-outlined text-xl">catching_pokemon</span>
+</div>
+<div class="text-[#e1e2e7]/40 p-3 flex flex-col items-center cursor-pointer hover:text-white transition-colors">
+<span class="material-symbols-outlined">star</span>
+</div>
+<div class="text-[#e1e2e7]/40 p-3 flex flex-col items-center cursor-pointer hover:text-white transition-colors">
+<span class="material-symbols-outlined">monitoring</span>
+</div>
+<div class="text-[#e1e2e7]/40 p-3 flex flex-col items-center cursor-pointer hover:text-white transition-colors">
+<span class="material-symbols-outlined">fingerprint</span>
+</div>
+</div>
+</nav>
+</body></html>
