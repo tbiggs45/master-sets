@@ -1,0 +1,13 @@
+{
+  "name": "master-sets-build",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Compiles JSX in src/index.html to plain JS for the iOS bundle",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/preset-react": "^7.24.0"
+  }
+}
