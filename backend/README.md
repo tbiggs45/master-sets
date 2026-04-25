@@ -18,7 +18,23 @@ Optional environment variables:
 - `PORT`
   Default: `8787`
 - `ALLOWED_ORIGIN`
-  Default: `*`
+  Default: `*` (set a specific origin or comma-separated allow-list in production)
+- `MAX_BODY_BYTES`
+  Default: `8388608` (8MB request cap)
+- `MAX_IMAGE_BASE64_LENGTH`
+  Default: `11000000` (~8MB JPEG payload cap)
+- `RATE_LIMIT_MAX`
+  Default: `60` requests per window per client IP
+- `RATE_LIMIT_WINDOW_MS`
+  Default: `60000` (1-minute window)
+- `ANTHROPIC_TIMEOUT_MS`
+  Default: `30000` (30-second model request timeout)
+- `ANTHROPIC_MODEL`
+  Default: `claude-haiku-4-5-20251001` (overrideable model name so deploys can switch safely)
+
+Additional behavior:
+- `POST /identify-card` requires `Content-Type: application/json`.
+- `imageBase64` accepts either raw base64 bytes or `data:image/...;base64,...` format.
 
 ## Endpoints
 
