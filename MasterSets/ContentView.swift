@@ -2,6 +2,14 @@ import SwiftUI
 import WebKit
 import AuthenticationServices
 
+private extension String {
+    /// Escapes backslashes then single quotes for safe embedding in a JS single-quoted string literal.
+    var jsEscaped: String {
+        replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+    }
+}
+
 // MARK: - Supabase Constants (not user-configurable)
 
 private enum Supabase {
@@ -178,16 +186,11 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
             let tokenData = credential.identityToken,
             let token = String(data: tokenData, encoding: .utf8)
         else { return }
-        let escaped = token.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-        webView?.evaluateJavaScript("window.handleAppleSignIn('\(escaped)')", completionHandler: nil)
+        webView?.evaluateJavaScript("window.handleAppleSignIn('\(token.jsEscaped)')", completionHandler: nil)
     }
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        let msg = error.localizedDescription
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-        webView?.evaluateJavaScript("window.handleAppleSignInError('\(msg)')", completionHandler: nil)
+        webView?.evaluateJavaScript("window.handleAppleSignInError('\(error.localizedDescription.jsEscaped)')", completionHandler: nil)
     }
 }
 
@@ -213,13 +216,13 @@ struct WebView: UIViewRepresentable {
 
         // Inject API key before page loads
         let keyScript = WKUserScript(
-            source: "window.ANTHROPIC_API_KEY = '\(apiKey.replacingOccurrences(of: "'", with: "\\'"))';",
+            source: "window.ANTHROPIC_API_KEY = '\(apiKey.jsEscaped)';",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )
         config.userContentController.addUserScript(keyScript)
         let backendScript = WKUserScript(
-            source: "window.POKEBINDER_SCAN_ENDPOINT = '\(backendURL.replacingOccurrences(of: "'", with: "\\'"))';",
+            source: "window.POKEBINDER_SCAN_ENDPOINT = '\(backendURL.jsEscaped)';",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )

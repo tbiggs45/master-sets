@@ -291,4 +291,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Master Set scan backend running on http://localhost:${PORT}`);
+  if (ALLOWED_ORIGIN === "*") {
+    console.warn("WARNING: ALLOWED_ORIGIN is not set — all origins can reach this backend. Set ALLOWED_ORIGIN in production.");
+  }
 });
