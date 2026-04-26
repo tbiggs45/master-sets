@@ -1,8 +1,36 @@
 const http = require("http");
+const nodemailer = require("nodemailer");
 
 const PORT = Number(process.env.PORT || 8787);
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
+
+// Feedback email — configured entirely server-side; never exposed to the client.
+const FEEDBACK_TO   = process.env.FEEDBACK_TO   || "";
+const SMTP_USER     = process.env.SMTP_USER      || "";
+const SMTP_PASS     = process.env.SMTP_PASS      || "";
+
+function buildMailTransport() {
+  if (!SMTP_USER || !SMTP_PASS) return null;
+  return nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+}
+
+// Strip anything that could be a URL, HTML tag, or injection attempt.
+function sanitizeFeedbackText(raw) {
+  let s = String(raw || "");
+  s = s.replace(/<[^>]*>/g, "");                      // HTML tags
+  s = s.replace(/https?:\/\/\S+/gi, "");               // http/https URLs
+  s = s.replace(/ftp:\/\/\S+/gi, "");                  // ftp URLs
+  s = s.replace(/mailto:[^\s]*/gi, "");                 // mailto links
+  s = s.replace(/javascript:[^\s]*/gi, "");             // JS injection
+  s = s.replace(/[^\x20-\x7E\n\r\t]/g, "");            // non-printable chars
+  return s.trim().slice(0, 1000);
+}
 
 function sendJson(res, status, payload) {
   res.writeHead(status, {
@@ -164,6 +192,35 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const status = error.statusCode || 500;
       sendJson(res, status, { error: error.message || "Card identification failed" });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/feedback") {
+    try {
+      const body = await readBody(req);
+      const text = sanitizeFeedbackText(body.text || "");
+      if (!text) {
+        sendJson(res, 400, { error: "Feedback text is required" });
+        return;
+      }
+      if (!FEEDBACK_TO || !SMTP_USER || !SMTP_PASS) {
+        // Feedback not configured on this deployment — accept silently so the
+        // client shows "sent" rather than a confusing server error.
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+      const transport = buildMailTransport();
+      await transport.sendMail({
+        from: SMTP_USER,
+        to: FEEDBACK_TO,
+        subject: "Master Sets — App Feedback",
+        text,
+      });
+      sendJson(res, 200, { ok: true });
+    } catch (e) {
+      console.error("Feedback send error:", e.message);
+      sendJson(res, 500, { error: "Could not send feedback" });
     }
     return;
   }

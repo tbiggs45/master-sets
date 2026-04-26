@@ -12,4 +12,10 @@ services:
         value: "*"           # Tighten to your app bundle origin after launch
       - key: PORT
         value: 10000         # Render free tier uses port 10000
+      - key: FEEDBACK_TO
+        sync: false          # Set in Render dashboard — recipient email address
+      - key: SMTP_USER
+        sync: false          # Set in Render dashboard — Gmail address used to send
+      - key: SMTP_PASS
+        sync: false          # Set in Render dashboard — Gmail App Password (not your login password)
     healthCheckPath: /health

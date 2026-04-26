@@ -1,0 +1,12 @@
+{
+  "name": "master-sets-build",
+  "version": "1.0.0",
+  "description": "Build pipeline: transpiles JSX from src/index.html → MasterSets/MasterSets/index.html",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/preset-react": "^7.24.0"
+  }
+}
