@@ -980,7 +980,7 @@ async function identifyCardWithVision(base64, stripBase64 = null) {
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 200,
-      system: `You are a Pokémon TCG card identification assistant. Analyze the card carefully and return ONLY a JSON object with no preamble or markdown backticks.\n\nThe image has been tightly cropped to the card face. When a second image is provided, it is a zoomed view of the bottom strip of the same card — prioritize it for reading the card number, set symbol, and copyright text.\n\nTo identify the SET accurately:\n- The card number at the bottom (e.g. "025/191") — the TOTAL (191) is highly specific to a set\n- The small set symbol icon at the bottom right near the number\n- The copyright/trademark text at the very bottom edge\n- Recent English sets by card total: Journey Together (190), Prismatic Evolutions (131), Surging Sparks (191), Stellar Crown (142), Shrouded Fable (99), Twilight Masquerade (167), Temporal Forces (162), Paldean Fates (91), Paradox Rift (182), Obsidian Flames (197), Pokemon 151 (165), Paldea Evolved (193), Scarlet & Violet Base (258).\n\nReturn this exact structure:\n{\n  "name": "card name as printed",\n  "setName": "official set name",\n  "number": "card number as printed (e.g. 025/191)",\n  "rarity": "rarity as printed or inferred from symbol",\n  "confidence": "high|medium|low",\n  "notes": "any issues or observations"\n}\n\nIf blurry or not a Pokémon card, set confidence to low and explain in notes.`,
+      system: `You are a Pokémon TCG card identification assistant. This tool supports English-language cards only. Analyze the card carefully and return ONLY a JSON object with no preamble or markdown backticks.\n\nThe image has been tightly cropped to the card face. When a second image is provided, it is a zoomed view of the bottom strip of the same card — prioritize it for reading the card number, set symbol, and copyright text.\n\nTo identify the SET accurately:\n- The card number at the bottom (e.g. "025/191") — the TOTAL (191) is highly specific to a set\n- The small set symbol icon at the bottom right near the number\n- The copyright/trademark text at the very bottom edge\n- Recent English sets by card total: Journey Together (190), Prismatic Evolutions (131), Surging Sparks (191), Stellar Crown (142), Shrouded Fable (99), Twilight Masquerade (167), Temporal Forces (162), Paldean Fates (91), Paradox Rift (182), Obsidian Flames (197), Pokemon 151 (165), Paldea Evolved (193), Scarlet & Violet Base (258).\n\nReturn this exact structure:\n{\n  "name": "card name as printed",\n  "setName": "official set name",\n  "number": "card number as printed (e.g. 025/191)",\n  "rarity": "rarity as printed or inferred from symbol",\n  "confidence": "high|medium|low",\n  "notes": "any issues or observations"\n}\n\nIf the card text is not in English, set confidence to low and begin notes with "non-English card". If blurry or not a Pokémon card, set confidence to low and explain in notes.`,
       messages: [{
         role: "user",
         content: [{
@@ -2113,6 +2113,11 @@ function ScanScreen({
     }, 30000);
     try {
       const visionResult = await identifyCardWithVision(base64, stripBase64);
+      // Reject non-English cards (non-Latin script in name/set, or AI flagged it).
+      const _nonLatinRe = /[぀-ゟ゠-ヿ가-힯ᄀ-ᇿ一-鿿㐀-䶿฀-๿]/;
+      if (_nonLatinRe.test((visionResult.name || "") + (visionResult.setName || "")) || (visionResult.notes || "").toLowerCase().startsWith("non-english card")) {
+        throw new Error("FOREIGN_CARD");
+      }
       // Kick off the TCG card lookup immediately in parallel with navigation so
       // ConfirmScreen can await this in-flight promise instead of starting from scratch.
       const cardFetchPromise = (visionResult?.name || "").trim() ? searchCardsByName(visionResult.name).catch(() => null) : null;
@@ -2123,7 +2128,7 @@ function ScanScreen({
       });
     } catch (e) {
       if (!mountedRef.current) return;
-      const msg = e.message.includes("NO_SCAN_BACKEND") ? "Card scanning is coming soon — stay tuned!" : e.message.includes("RATE_LIMITED") ? "Too many scans — try again in a moment" : e.message.includes("TIMEOUT") ? "Analysis timed out — please try again" : e.message.includes("401") || e.message.includes("403") ? "Scan service unavailable — try again later" : "Couldn't identify card — try better lighting or a clearer angle";
+      const msg = e.message.includes("NO_SCAN_BACKEND") ? "Card scanning is coming soon — stay tuned!" : e.message.includes("RATE_LIMITED") ? "Too many scans — try again in a moment" : e.message.includes("TIMEOUT") ? "Analysis timed out — please try again" : e.message.includes("FOREIGN_CARD") ? "Foreign cards aren't supported yet — English cards only" : e.message.includes("401") || e.message.includes("403") ? "Scan service unavailable — try again later" : "Couldn't identify card — try better lighting or a clearer angle";
       setIdentifyError(msg);
       showToast(msg, "error");
       setCapturedFrame(null);
@@ -2220,7 +2225,7 @@ function ScanScreen({
     name: "arrow_back",
     size: 18,
     color: "#fff"
-  })), /*#__PURE__*/React.createElement("span", {
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 18,
       fontWeight: 900,
@@ -2228,7 +2233,14 @@ function ScanScreen({
       letterSpacing: "-0.02em",
       textTransform: "uppercase"
     }
-  }, "Scan Card")), /*#__PURE__*/React.createElement("div", {
+  }, "Scan Card"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "rgba(255,255,255,0.45)",
+      fontWeight: 600,
+      letterSpacing: "0.04em"
+    }
+  }, "English cards only"))), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       display: "flex",
@@ -5994,6 +6006,12 @@ function ProfileScreen({
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSending, setFeedbackSending] = useState(false);
+  const [tipProducts, setTipProducts] = useState(null); // null = not loaded, [] = unavailable
+  const [tipBusy, setTipBusy] = useState(false);
+  const [showTip, setShowTip] = useState(false);
+  const [customTipInput, setCustomTipInput] = useState("");
+  const [customTipMatch, setCustomTipMatch] = useState(null); // nearest product to typed amount
+
   useEffect(() => {
     let mounted = true;
     loadSyncMeta().then(meta => {
@@ -6003,6 +6021,25 @@ function ProfileScreen({
       mounted = false;
     };
   }, [authState]);
+
+  // Lock body scroll/position when feedback modal is open so iOS keyboard
+  // cannot resize the WKWebView viewport and shift the underlying layout.
+  useEffect(() => {
+    if (showFeedback) {
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+    };
+  }, [showFeedback]);
   async function handleAppleSignIn() {
     setBusy(true);
     try {
@@ -6077,6 +6114,58 @@ function ProfileScreen({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Register native callbacks and load products when tip section is first opened.
+  function openTip() {
+    setShowTip(true);
+    if (tipProducts !== null) return; // already loaded or loading
+    window.handleTipProducts = products => {
+      setTipProducts(Array.isArray(products) ? products : []);
+      setTipBusy(false);
+    };
+    window.handleTipResult = result => {
+      setTipBusy(false);
+      if (result.cancelled || result.pending) return;
+      if (result.success) {
+        setShowTip(false);
+        setToast({
+          message: "Thank you for the tip! 🎉",
+          type: "info"
+        });
+      } else {
+        setToast({
+          message: result.error || "Purchase failed — please try again",
+          type: "error"
+        });
+      }
+    };
+    if (window.webkit?.messageHandlers?.tip) {
+      window.webkit.messageHandlers.tip.postMessage({
+        action: "fetchProducts"
+      });
+    } else {
+      setTipProducts([]); // not running in native app
+    }
+  }
+  function handleTipPurchase(productID) {
+    if (!window.webkit?.messageHandlers?.tip) return;
+    setTipBusy(true);
+    window.webkit.messageHandlers.tip.postMessage({
+      action: "purchase",
+      productID
+    });
+  }
+
+  // Parse the custom input and find the nearest available product by price.
+  function resolveCustomTip(input, products) {
+    const val = parseFloat(input.replace(/[^0-9.]/g, ""));
+    if (!val || !products?.length) return null;
+    return products.reduce((best, p) => {
+      const pPrice = parseFloat(p.price.replace(/[^0-9.]/g, "")) || 0;
+      const bPrice = parseFloat(best.price.replace(/[^0-9.]/g, "")) || 0;
+      return Math.abs(pPrice - val) < Math.abs(bPrice - val) ? p : best;
+    });
   }
   async function handleSendFeedback() {
     // Strip URLs, HTML, and non-printable chars before sending.
@@ -6479,7 +6568,7 @@ function ProfileScreen({
     style: {
       marginTop: 12
     }
-  }, showFeedback ? /*#__PURE__*/React.createElement("div", {
+  }, showTip ? /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#131315",
       borderRadius: 32,
@@ -6491,73 +6580,275 @@ function ProfileScreen({
       color: "#A1A1A1",
       textTransform: "uppercase",
       letterSpacing: "0.15em",
-      marginBottom: 12,
+      marginBottom: 4,
       fontWeight: 700
     }
-  }, "Send Feedback"), /*#__PURE__*/React.createElement("textarea", {
-    autoFocus: true,
-    value: feedbackText,
-    onChange: e => setFeedbackText(e.target.value.slice(0, 1000)),
-    placeholder: "Tell us what you think\u2026",
-    rows: 5,
+  }, "Send a Tip"), /*#__PURE__*/React.createElement("div", {
     style: {
-      width: "100%",
-      padding: "14px 16px",
-      background: "#1C1C1E",
-      border: "none",
-      borderRadius: 16,
-      color: "#FFFFFF",
-      fontSize: 15,
-      lineHeight: 1.55,
-      resize: "none",
-      outline: "none",
-      fontFamily: "inherit"
+      fontSize: 13,
+      color: "#6C6C6E",
+      marginBottom: 16,
+      lineHeight: 1.5
     }
-  }), /*#__PURE__*/React.createElement("div", {
+  }, "Enjoying Master Sets? A tip helps keep it going. 100% goes to the developer."), tipProducts === null ? /*#__PURE__*/React.createElement(LoadingSpinner, {
+    label: "Loading\u2026"
+  }) : tipProducts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#6C6C6E",
+      fontSize: 13,
+      textAlign: "center",
+      padding: "8px 0"
+    }
+  }, "Tips unavailable right now \u2014 try again later.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, tipProducts.map(p => /*#__PURE__*/React.createElement("button", {
+    key: p.id,
+    onClick: () => !tipBusy && handleTipPurchase(p.id),
+    disabled: tipBusy,
+    style: {
+      padding: "14px 18px",
+      background: tipBusy ? "#3A3A3C" : "#1C1C1E",
+      borderRadius: 9999,
+      border: "1px solid rgba(255,255,255,0.08)",
+      cursor: tipBusy ? "not-allowed" : "pointer",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      opacity: tipBusy ? 0.6 : 1
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#FFFFFF",
+      fontWeight: 700,
+      fontSize: 15
+    }
+  }, p.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#00C4BC",
+      fontWeight: 800,
+      fontSize: 15
+    }
+  }, p.price)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      height: 1,
+      background: "#3A3A3C"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: "#6C6C6E",
-      textAlign: "right",
-      marginTop: 4,
-      marginBottom: 14
+      fontWeight: 700,
+      letterSpacing: "0.08em"
     }
-  }, feedbackText.trim().length, "/1000"), /*#__PURE__*/React.createElement("div", {
+  }, "OR CUSTOM AMOUNT"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      height: 1,
+      background: "#3A3A3C"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "absolute",
+      left: 14,
+      top: "50%",
+      transform: "translateY(-50%)",
+      color: "#A1A1A1",
+      fontWeight: 700,
+      fontSize: 16,
+      pointerEvents: "none"
+    }
+  }, "$"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0.99",
+    step: "0.01",
+    placeholder: "0.00",
+    value: customTipInput,
+    onChange: e => {
+      const v = e.target.value;
+      setCustomTipInput(v);
+      setCustomTipMatch(resolveCustomTip(v, tipProducts));
+    },
+    style: {
+      width: "100%",
+      padding: "13px 14px 13px 28px",
+      background: "#1C1C1E",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: 9999,
+      color: "#FFFFFF",
+      fontSize: 16,
+      outline: "none"
+    }
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => customTipMatch && !tipBusy && handleTipPurchase(customTipMatch.id),
+    disabled: !customTipMatch || tipBusy,
+    style: {
+      padding: "13px 20px",
+      background: customTipMatch && !tipBusy ? "#00C4BC" : "#3A3A3C",
+      borderRadius: 9999,
+      border: "none",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 14,
+      cursor: customTipMatch && !tipBusy ? "pointer" : "not-allowed",
+      flexShrink: 0
+    }
+  }, tipBusy ? "…" : "Send")), customTipMatch && customTipInput && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6C6C6E",
+      marginTop: 6,
+      textAlign: "center"
+    }
+  }, "Nearest available: ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#00C4BC",
+      fontWeight: 700
+    }
+  }, customTipMatch.price)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      margin: "18px 0 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      height: 1,
+      background: "#3A3A3C"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#6C6C6E",
+      fontWeight: 700,
+      letterSpacing: "0.08em"
+    }
+  }, "OR SUPPORT EXTERNALLY"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      height: 1,
+      background: "#3A3A3C"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
       gap: 8
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: handleSendFeedback,
-    disabled: feedbackSending || !feedbackText.trim(),
+    onClick: () => window.webkit?.messageHandlers?.openTipPage?.postMessage("kofi"),
     style: {
-      padding: "14px",
-      minHeight: 52,
-      background: feedbackText.trim() && !feedbackSending ? "#00C4BC" : "#3A3A3C",
+      padding: "13px 10px",
+      background: "#1C1C1E",
       borderRadius: 9999,
-      color: "#fff",
-      fontWeight: 800,
-      border: "none",
-      cursor: feedbackText.trim() && !feedbackSending ? "pointer" : "not-allowed",
+      border: "1px solid rgba(255,255,255,0.08)",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16
+    }
+  }, "\u2615"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#FFFFFF",
+      fontWeight: 700,
       fontSize: 14
     }
-  }, feedbackSending ? "Sending…" : "Send"), /*#__PURE__*/React.createElement("button", {
+  }, "Ko-fi")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => window.webkit?.messageHandlers?.openTipPage?.postMessage("paypal"),
+    style: {
+      padding: "13px 10px",
+      background: "#1C1C1E",
+      borderRadius: 9999,
+      border: "1px solid rgba(255,255,255,0.08)",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16
+    }
+  }, "\uD83C\uDD7F\uFE0F"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#FFFFFF",
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, "PayPal")))), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
-      setShowFeedback(false);
-      setFeedbackText("");
+      setShowTip(false);
+      setCustomTipInput("");
+      setCustomTipMatch(null);
     },
     style: {
-      padding: "14px",
-      minHeight: 52,
-      background: "#1C1C1E",
+      marginTop: 14,
+      width: "100%",
+      padding: "13px",
+      background: "none",
+      border: "none",
+      color: "#6C6C6E",
+      fontWeight: 700,
+      fontSize: 14,
+      cursor: "pointer"
+    }
+  }, "Maybe Later")) : /*#__PURE__*/React.createElement("button", {
+    onClick: openTip,
+    style: {
+      width: "100%",
+      padding: "16px",
+      minHeight: 56,
+      background: "#131315",
       borderRadius: 9999,
       color: "#A1A1A1",
       fontWeight: 700,
       border: "none",
       cursor: "pointer",
-      fontSize: 14
+      fontSize: 15,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8
     }
-  }, "Cancel"))) : /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(MatIcon, {
+    name: "volunteer_activism",
+    size: 20,
+    color: "#A1A1A1"
+  }), "Send a Tip")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowFeedback(true),
     style: {
       width: "100%",
@@ -6579,7 +6870,115 @@ function ProfileScreen({
     name: "rate_review",
     size: 20,
     color: "#A1A1A1"
-  }), "Send Feedback")), !configured && /*#__PURE__*/React.createElement("div", {
+  }), "Send Feedback")), showFeedback && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 300,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "0 24px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      setShowFeedback(false);
+      setFeedbackText("");
+    },
+    style: {
+      position: "absolute",
+      inset: 0,
+      background: "rgba(0,0,0,0.72)",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      zIndex: 1,
+      background: "#1C1C1E",
+      borderRadius: 20,
+      padding: "24px 20px 20px",
+      width: "100%",
+      maxWidth: 400,
+      boxShadow: "0 20px 60px rgba(0,0,0,0.6)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 17,
+      fontWeight: 700,
+      color: "#FFFFFF",
+      marginBottom: 4
+    }
+  }, "Send Feedback"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#8E8E93",
+      marginBottom: 16
+    }
+  }, "Share your thoughts or report an issue."), /*#__PURE__*/React.createElement("textarea", {
+    value: feedbackText,
+    onChange: e => setFeedbackText(e.target.value.slice(0, 1000)),
+    placeholder: "What's on your mind?",
+    rows: 4,
+    style: {
+      width: "100%",
+      padding: "12px 14px",
+      background: "#2C2C2E",
+      border: "none",
+      borderRadius: 12,
+      color: "#FFFFFF",
+      fontSize: 15,
+      lineHeight: 1.55,
+      resize: "none",
+      outline: "none",
+      fontFamily: "inherit",
+      boxSizing: "border-box"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6C6C6E",
+      textAlign: "right",
+      marginTop: 4,
+      marginBottom: 16
+    }
+  }, feedbackText.trim().length, "/1000"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setShowFeedback(false);
+      setFeedbackText("");
+    },
+    style: {
+      flex: 1,
+      padding: "13px",
+      background: "#3A3A3C",
+      borderRadius: 12,
+      color: "#A1A1A1",
+      fontWeight: 600,
+      border: "none",
+      cursor: "pointer",
+      fontSize: 15
+    }
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    onClick: handleSendFeedback,
+    disabled: feedbackSending || !feedbackText.trim(),
+    style: {
+      flex: 2,
+      padding: "13px",
+      background: feedbackText.trim() && !feedbackSending ? "#00C4BC" : "#3A3A3C",
+      borderRadius: 12,
+      color: "#fff",
+      fontWeight: 700,
+      border: "none",
+      cursor: feedbackText.trim() && !feedbackSending ? "pointer" : "not-allowed",
+      fontSize: 15
+    }
+  }, feedbackSending ? "Sending…" : "Send Feedback")))), !configured && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 16,
       background: "#131315",
@@ -8492,6 +8891,6 @@ function App() {
 }
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(/*#__PURE__*/React.createElement(App, null));
-</script>
+  </script>
 </body>
 </html>

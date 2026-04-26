@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Compiles src/index.html (JSX source) → MasterSets/index.html (plain JS).
+ * Compiles src/index.html (JSX source) → MasterSets/MasterSets/index.html (plain JS).
  * Run: cd scripts && npm run build
  *
  * What this does:
@@ -15,7 +15,7 @@ const path = require("path");
 const babel = require("@babel/core");
 
 const srcPath = path.resolve(__dirname, "../src/index.html");
-const outPath = path.resolve(__dirname, "../MasterSets/index.html");
+const outPath = path.resolve(__dirname, "../MasterSets/MasterSets/index.html");
 
 const html = fs.readFileSync(srcPath, "utf8");
 
