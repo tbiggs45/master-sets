@@ -3018,6 +3018,25 @@
                           Nearest available: <span style={{ color: "#00C4BC", fontWeight: 700 }}>{customTipMatch.price}</span>
                         </div>
                       )}
+
+                      {/* External options */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0 14px" }}>
+                        <div style={{ flex: 1, height: 1, background: "#3A3A3C" }} />
+                        <span style={{ fontSize: 11, color: "#6C6C6E", fontWeight: 700, letterSpacing: "0.08em" }}>OR SUPPORT EXTERNALLY</span>
+                        <div style={{ flex: 1, height: 1, background: "#3A3A3C" }} />
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <button onClick={() => window.webkit?.messageHandlers?.openTipPage?.postMessage("kofi")}
+                          style={{ padding: "13px 10px", background: "#1C1C1E", borderRadius: 9999, border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                          <span style={{ fontSize: 16 }}>☕</span>
+                          <span style={{ color: "#FFFFFF", fontWeight: 700, fontSize: 14 }}>Ko-fi</span>
+                        </button>
+                        <button onClick={() => window.webkit?.messageHandlers?.openTipPage?.postMessage("paypal")}
+                          style={{ padding: "13px 10px", background: "#1C1C1E", borderRadius: 9999, border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                          <span style={{ fontSize: 16 }}>🅿️</span>
+                          <span style={{ color: "#FFFFFF", fontWeight: 700, fontSize: 14 }}>PayPal</span>
+                        </button>
+                      </div>
                     </>
                   )}
                   <button onClick={() => { setShowTip(false); setCustomTipInput(""); setCustomTipMatch(null); }}

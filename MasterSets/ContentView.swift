@@ -2,6 +2,7 @@ import SwiftUI
 import WebKit
 import AuthenticationServices
 import StoreKit
+import SafariServices
 
 private extension String {
     /// Escapes backslashes then single quotes for safe embedding in a JS single-quoted string literal.
@@ -286,6 +287,38 @@ private final class TipMessageHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
+// MARK: - External Tip Links
+
+/// URLs opened in SFSafariViewController — stays inside the app, no App Switch,
+/// satisfies App Review by not directing users away from the app entirely.
+private enum ExternalTip {
+    static let kofi    = URL(string: "https://ko-fi.com/big_hams")!
+    static let paypal  = URL(string: "https://paypal.me/tsbigham")!
+}
+
+private final class ExternalTipMessageHandler: NSObject, WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "openTipPage",
+              let key = message.body as? String else { return }
+        let url: URL
+        switch key {
+        case "kofi":   url = ExternalTip.kofi
+        case "paypal": url = ExternalTip.paypal
+        default: return
+        }
+        DispatchQueue.main.async {
+            let vc = SFSafariViewController(url: url)
+            vc.preferredControlTintColor = UIColor(red: 0, green: 0.77, blue: 0.74, alpha: 1) // #00C4BC
+            UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }?
+                .rootViewController?
+                .present(vc, animated: true)
+        }
+    }
+}
+
 // MARK: - WKWebView Wrapper
 
 struct WebView: UIViewRepresentable {
@@ -306,6 +339,7 @@ struct WebView: UIViewRepresentable {
         // Register native message handlers
         config.userContentController.add(AppleSignInMessageHandler(coordinator: context.coordinator), name: "appleSignIn")
         config.userContentController.add(TipMessageHandler(manager: context.coordinator.tipManager), name: "tip")
+        config.userContentController.add(ExternalTipMessageHandler(), name: "openTipPage")
 
         // Inject API key before page loads
         let keyScript = WKUserScript(
