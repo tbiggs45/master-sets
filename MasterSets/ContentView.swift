@@ -57,7 +57,7 @@ struct APIKeyEntryView: View {
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.gray)
                             .kerning(1)
-                        TextField("http://127.0.0.1:8787", text: $backendDraft)
+                        TextField(ScanBackend.defaultEndpoint, text: $backendDraft)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)

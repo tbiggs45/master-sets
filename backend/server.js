@@ -170,7 +170,7 @@ function _cacheSet(b64, value) {
   _resultCache.set(_fingerprint(b64), { value, ts: Date.now() });
 }
 
-async function identifyCard(imageBase64) {
+async function identifyCard(imageBase64, bottomStripBase64 = null) {
   if (!ANTHROPIC_API_KEY) {
     throw new Error("Server is missing ANTHROPIC_API_KEY");
   }
@@ -187,22 +187,22 @@ async function identifyCard(imageBase64) {
       "Content-Type": "application/json",
       "x-api-key": ANTHROPIC_API_KEY,
       "anthropic-version": "2023-06-01",
-      // Enables prompt caching so the static system prompt is cached server-side,
-      // cutting time-to-first-token on subsequent requests by ~1-2 s.
       "anthropic-beta": "prompt-caching-2024-07-31",
     },
     body: JSON.stringify({
       model: MODEL_NAME,
-      max_tokens: 400,
+      max_tokens: 200,
       system: [{
         type: "text",
-        text: `You are a Pokemon TCG card identification assistant. Analyze the card image carefully and return ONLY a JSON object with no preamble or markdown backticks.
+        text: `You are a Pokemon TCG card identification assistant. This tool supports English-language cards only. Analyze the card carefully and return ONLY a JSON object with no preamble or markdown backticks.
+
+The image has been tightly cropped to the card face. When a second image is provided, it is a zoomed view of the bottom strip of the same card — prioritize it for reading the card number, set symbol, and copyright text.
 
 To identify the SET accurately:
 - The card number at the bottom (e.g. "025/191") — the TOTAL (191) is highly specific to a set
 - The small set symbol icon at the bottom right near the number
 - The copyright/trademark text at the very bottom edge
-- Recent English sets by card total: Surging Sparks (191), Stellar Crown (142), Shrouded Fable (99), Twilight Masquerade (167), Temporal Forces (162), Paldean Fates (91), Paradox Rift (182), Obsidian Flames (197), Pokemon 151 (165), Paldea Evolved (193), Scarlet & Violet Base (258).
+- Recent English sets by card total: Journey Together (190), Prismatic Evolutions (131), Surging Sparks (191), Stellar Crown (142), Shrouded Fable (99), Twilight Masquerade (167), Temporal Forces (162), Paldean Fates (91), Paradox Rift (182), Obsidian Flames (197), Pokemon 151 (165), Paldea Evolved (193), Scarlet & Violet Base (258).
 
 Return this exact structure:
 {
@@ -214,14 +214,15 @@ Return this exact structure:
   "notes": "any issues or observations"
 }
 
-If blurry or not a Pokemon card, set confidence to low and explain in notes.`,
+If the card text is not in English, set confidence to low and begin notes with "non-English card". If blurry or not a Pokemon card, set confidence to low and explain in notes.`,
         cache_control: { type: "ephemeral" },
       }],
       messages: [{
         role: "user",
         content: [
           { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageBase64 } },
-          { type: "text", text: "Identify this Pokemon card." },
+          ...(bottomStripBase64 ? [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: bottomStripBase64 } }] : []),
+          { type: "text", text: bottomStripBase64 ? "Image 1: full card. Image 2: zoomed bottom strip (card number + set symbol). Identify this Pokemon card." : "Identify this Pokemon card." },
         ],
       }],
     }),
@@ -298,8 +299,9 @@ const server = http.createServer(async (req, res) => {
         sendJson(req, res, 400, { error: "Invalid imageBase64 payload" });
         return;
       }
+      const normalizedStrip = body.bottomStripBase64 ? normalizeBase64Image(body.bottomStripBase64) : null;
 
-      const result = await identifyCard(normalizedImage);
+      const result = await identifyCard(normalizedImage, normalizedStrip);
       sendJson(req, res, 200, result);
     } catch (error) {
       const status = error.statusCode || 500;
@@ -311,7 +313,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "POST" && req.url === "/feedback") {
+  if (req.method === "POST" && pathname === "/feedback") {
     try {
       const body = await readBody(req);
       const text = sanitizeFeedbackText(body.text || "");
