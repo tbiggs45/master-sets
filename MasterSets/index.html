@@ -6829,13 +6829,66 @@ function ProfileScreen({
     style: {
       marginTop: 12
     }
-  }, showFeedback ? /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowFeedback(true),
     style: {
+      width: "100%",
+      padding: "16px",
+      minHeight: 56,
       background: "#131315",
-      borderRadius: 32,
-      padding: 20
+      borderRadius: 9999,
+      color: "#A1A1A1",
+      fontWeight: 700,
+      border: "none",
+      cursor: "pointer",
+      fontSize: 15,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(MatIcon, {
+    name: "rate_review",
+    size: 20,
+    color: "#A1A1A1"
+  }), "Send Feedback")), showFeedback && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 300,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "flex-end"
     }
   }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      setShowFeedback(false);
+      setFeedbackText("");
+    },
+    style: {
+      position: "absolute",
+      inset: 0,
+      background: "rgba(0,0,0,0.65)",
+      backdropFilter: "blur(6px)",
+      WebkitBackdropFilter: "blur(6px)"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      background: "#131315",
+      borderRadius: "28px 28px 0 0",
+      padding: "12px 20px 40px",
+      zIndex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 36,
+      height: 4,
+      background: "#3A3A3C",
+      borderRadius: 2,
+      margin: "0 auto 20px"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: "#A1A1A1",
@@ -6845,7 +6898,6 @@ function ProfileScreen({
       fontWeight: 700
     }
   }, "Send Feedback"), /*#__PURE__*/React.createElement("textarea", {
-    autoFocus: true,
     value: feedbackText,
     onChange: e => setFeedbackText(e.target.value.slice(0, 1000)),
     placeholder: "Tell us what you think\u2026",
@@ -6907,29 +6959,7 @@ function ProfileScreen({
       cursor: "pointer",
       fontSize: 14
     }
-  }, "Cancel"))) : /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowFeedback(true),
-    style: {
-      width: "100%",
-      padding: "16px",
-      minHeight: 56,
-      background: "#131315",
-      borderRadius: 9999,
-      color: "#A1A1A1",
-      fontWeight: 700,
-      border: "none",
-      cursor: "pointer",
-      fontSize: 15,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement(MatIcon, {
-    name: "rate_review",
-    size: 20,
-    color: "#A1A1A1"
-  }), "Send Feedback")), !configured && /*#__PURE__*/React.createElement("div", {
+  }, "Cancel")))), !configured && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 16,
       background: "#131315",

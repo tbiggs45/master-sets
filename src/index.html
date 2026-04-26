@@ -3053,13 +3053,29 @@
               )}
             </div>
 
-            {/* Feedback */}
+            {/* Feedback — button only; form renders as a fixed modal so it
+                never affects the document flow or triggers layout shifts */}
             <div style={{ marginTop: 12 }}>
-              {showFeedback ? (
-                <div style={{ background: "#131315", borderRadius: 32, padding: 20 }}>
+              <button
+                onClick={() => setShowFeedback(true)}
+                style={{ width: "100%", padding: "16px", minHeight: 56, background: "#131315", borderRadius: 9999, color: "#A1A1A1", fontWeight: 700, border: "none", cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <MatIcon name="rate_review" size={20} color="#A1A1A1" />
+                Send Feedback
+              </button>
+            </div>
+
+            {/* Feedback modal — fixed overlay, rendered outside scroll container */}
+            {showFeedback && (
+              <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                {/* Backdrop — tap to dismiss */}
+                <div onClick={() => { setShowFeedback(false); setFeedbackText(""); }}
+                  style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }} />
+                {/* Sheet */}
+                <div style={{ position: "relative", background: "#131315", borderRadius: "28px 28px 0 0", padding: "12px 20px 40px", zIndex: 1 }}>
+                  {/* Drag handle */}
+                  <div style={{ width: 36, height: 4, background: "#3A3A3C", borderRadius: 2, margin: "0 auto 20px" }} />
                   <div style={{ fontSize: 10, color: "#A1A1A1", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12, fontWeight: 700 }}>Send Feedback</div>
                   <textarea
-                    autoFocus
                     value={feedbackText}
                     onChange={e => setFeedbackText(e.target.value.slice(0, 1000))}
                     placeholder="Tell us what you think…"
@@ -3081,15 +3097,8 @@
                     </button>
                   </div>
                 </div>
-              ) : (
-                <button
-                  onClick={() => setShowFeedback(true)}
-                  style={{ width: "100%", padding: "16px", minHeight: 56, background: "#131315", borderRadius: 9999, color: "#A1A1A1", fontWeight: 700, border: "none", cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <MatIcon name="rate_review" size={20} color="#A1A1A1" />
-                  Send Feedback
-                </button>
-              )}
-            </div>
+              </div>
+            )}
 
             {!configured && (
               <div style={{ marginTop: 16, background: "#131315", borderRadius: 20, padding: 16, color: "#A1A1A1", fontSize: 13, lineHeight: 1.5 }}>
