@@ -1,4 +1,27 @@
+# Auth keys — never commit
 AuthKey*.p8
 *.p8
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.xcbkptlist
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# Node (backend + scripts)
 node_modules/
+.env
+.env.local
+npm-debug.log*
+
+# iCloud placeholders
+*.icloud

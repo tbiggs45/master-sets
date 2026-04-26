@@ -1,55 +1,57 @@
 #!/usr/bin/env node
 /**
- * Build script: transpiles JSX in src/index.html and writes compiled output
- * to MasterSets/MasterSets/index.html (removing the Babel Standalone CDN dep).
+ * Compiles src/index.html (JSX source) → MasterSets/index.html (plain JS).
+ * Run: cd scripts && npm run build
  *
- * Usage: cd scripts && npm run build
+ * What this does:
+ *   1. Removes the Babel Standalone CDN <script> tag
+ *   2. Finds the <script type="text/babel"> block
+ *   3. Compiles its JSX content with @babel/preset-react (classic runtime)
+ *   4. Replaces the block with a plain <script> containing the compiled output
  */
 
-const fs = require('fs');
-const path = require('path');
-const babel = require('@babel/core');
+const fs = require("fs");
+const path = require("path");
+const babel = require("@babel/core");
 
-const SRC = path.resolve(__dirname, '../src/index.html');
-const OUT = path.resolve(__dirname, '../MasterSets/MasterSets/index.html');
+const srcPath = path.resolve(__dirname, "../src/index.html");
+const outPath = path.resolve(__dirname, "../MasterSets/index.html");
 
-let html = fs.readFileSync(SRC, 'utf8');
+const html = fs.readFileSync(srcPath, "utf8");
 
-// 1. Remove the Babel Standalone <script> tag
-html = html.replace(
-  /[ \t]*<script[^>]*unpkg\.com\/@babel\/standalone[^>]*><\/script>\n?/,
-  ''
+// 1. Strip the Babel Standalone CDN tag (with or without surrounding whitespace/newline)
+let output = html.replace(
+  /[ \t]*<script\s+src="https:\/\/unpkg\.com\/@babel\/standalone\/babel\.min\.js"[^>]*><\/script>\n?/,
+  ""
 );
 
-// 2. Find the <script type="text/babel" ...> block
-const babelScriptRe = /<script\s[^>]*type="text\/babel"[^>]*>([\s\S]*?)<\/script>/;
-const match = html.match(babelScriptRe);
+// 2. Locate the <script type="text/babel" …> … </script> block
+const BABEL_BLOCK_RE = /(<script\s[^>]*type="text\/babel"[^>]*>)([\s\S]*?)(<\/script>)/;
+const match = BABEL_BLOCK_RE.exec(output);
 if (!match) {
-  console.error('ERROR: Could not find <script type="text/babel"> in src/index.html');
+  console.error("ERROR: Could not find <script type=\"text/babel\"> block in src/index.html");
   process.exit(1);
 }
 
-const jsxSource = match[1];
+const jsxSource = match[2];
 
-// 3. Transpile JSX → plain JS
-const result = babel.transformSync(jsxSource, {
-  presets: ['@babel/preset-react'],
-  compact: false,
-});
-
-if (!result || !result.code) {
-  console.error('ERROR: Babel transpilation failed.');
+// 3. Compile JSX → plain JS (no module transform; app uses global React)
+let compiled;
+try {
+  const result = babel.transformSync(jsxSource, {
+    presets: [["@babel/preset-react", { runtime: "classic" }]],
+    filename: "app.jsx",
+    sourceMaps: false,
+    compact: false,
+  });
+  compiled = result.code;
+} catch (err) {
+  console.error("Babel compilation failed:\n", err.message);
   process.exit(1);
 }
 
-// 4. Replace the babel script tag with a plain <script> tag
-html = html.replace(
-  babelScriptRe,
-  `<script>\n${result.code}\n</script>`
-);
+// 4. Replace the babel block with plain <script>
+output = output.replace(match[0], `<script>\n${compiled}\n  </script>`);
 
-// 5. Write output
-fs.mkdirSync(path.dirname(OUT), { recursive: true });
-fs.writeFileSync(OUT, html, 'utf8');
-
-console.log(`Built: ${OUT}`);
+fs.writeFileSync(outPath, output, "utf8");
+console.log(`Built: ${outPath}`);

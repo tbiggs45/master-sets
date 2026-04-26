@@ -1,7 +1,8 @@
 {
   "name": "master-sets-build",
   "version": "1.0.0",
-  "description": "Build pipeline: transpiles JSX from src/index.html → MasterSets/MasterSets/index.html",
+  "private": true,
+  "description": "Compiles JSX in src/index.html to plain JS for the iOS bundle",
   "scripts": {
     "build": "node build.js"
   },
