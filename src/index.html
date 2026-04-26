@@ -2758,6 +2758,25 @@
         return () => { mounted = false; };
       }, [authState]);
 
+      // Lock body scroll/position when feedback modal is open so iOS keyboard
+      // cannot resize the WKWebView viewport and shift the underlying layout.
+      useEffect(() => {
+        if (showFeedback) {
+          document.body.style.position = "fixed";
+          document.body.style.width = "100%";
+          document.body.style.overflow = "hidden";
+        } else {
+          document.body.style.position = "";
+          document.body.style.width = "";
+          document.body.style.overflow = "";
+        }
+        return () => {
+          document.body.style.position = "";
+          document.body.style.width = "";
+          document.body.style.overflow = "";
+        };
+      }, [showFeedback]);
+
       async function handleAppleSignIn() {
         setBusy(true);
         try { await signInWithApple(); setToast({ message: "Continuing sign in with Apple…", type: "info" }); }
@@ -3064,36 +3083,35 @@
               </button>
             </div>
 
-            {/* Feedback modal — fixed overlay, rendered outside scroll container */}
+            {/* Feedback dialog — centered popup, body locked to prevent WKWebView viewport shift */}
             {showFeedback && (
-              <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+              <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
                 {/* Backdrop — tap to dismiss */}
                 <div onClick={() => { setShowFeedback(false); setFeedbackText(""); }}
-                  style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }} />
-                {/* Sheet */}
-                <div style={{ position: "relative", background: "#131315", borderRadius: "28px 28px 0 0", padding: "12px 20px 40px", zIndex: 1 }}>
-                  {/* Drag handle */}
-                  <div style={{ width: 36, height: 4, background: "#3A3A3C", borderRadius: 2, margin: "0 auto 20px" }} />
-                  <div style={{ fontSize: 10, color: "#A1A1A1", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12, fontWeight: 700 }}>Send Feedback</div>
+                  style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }} />
+                {/* Dialog card */}
+                <div style={{ position: "relative", zIndex: 1, background: "#1C1C1E", borderRadius: 20, padding: "24px 20px 20px", width: "100%", maxWidth: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: "#FFFFFF", marginBottom: 4 }}>Send Feedback</div>
+                  <div style={{ fontSize: 13, color: "#8E8E93", marginBottom: 16 }}>Share your thoughts or report an issue.</div>
                   <textarea
                     value={feedbackText}
                     onChange={e => setFeedbackText(e.target.value.slice(0, 1000))}
-                    placeholder="Tell us what you think…"
-                    rows={5}
-                    style={{ width: "100%", padding: "14px 16px", background: "#1C1C1E", border: "none", borderRadius: 16, color: "#FFFFFF", fontSize: 15, lineHeight: 1.55, resize: "none", outline: "none", fontFamily: "inherit" }}
+                    placeholder="What's on your mind?"
+                    rows={4}
+                    style={{ width: "100%", padding: "12px 14px", background: "#2C2C2E", border: "none", borderRadius: 12, color: "#FFFFFF", fontSize: 15, lineHeight: 1.55, resize: "none", outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
                   />
-                  <div style={{ fontSize: 11, color: "#6C6C6E", textAlign: "right", marginTop: 4, marginBottom: 14 }}>{feedbackText.trim().length}/1000</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ fontSize: 11, color: "#6C6C6E", textAlign: "right", marginTop: 4, marginBottom: 16 }}>{feedbackText.trim().length}/1000</div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      onClick={() => { setShowFeedback(false); setFeedbackText(""); }}
+                      style={{ flex: 1, padding: "13px", background: "#3A3A3C", borderRadius: 12, color: "#A1A1A1", fontWeight: 600, border: "none", cursor: "pointer", fontSize: 15 }}>
+                      Cancel
+                    </button>
                     <button
                       onClick={handleSendFeedback}
                       disabled={feedbackSending || !feedbackText.trim()}
-                      style={{ padding: "14px", minHeight: 52, background: feedbackText.trim() && !feedbackSending ? "#00C4BC" : "#3A3A3C", borderRadius: 9999, color: "#fff", fontWeight: 800, border: "none", cursor: feedbackText.trim() && !feedbackSending ? "pointer" : "not-allowed", fontSize: 14 }}>
-                      {feedbackSending ? "Sending…" : "Send"}
-                    </button>
-                    <button
-                      onClick={() => { setShowFeedback(false); setFeedbackText(""); }}
-                      style={{ padding: "14px", minHeight: 52, background: "#1C1C1E", borderRadius: 9999, color: "#A1A1A1", fontWeight: 700, border: "none", cursor: "pointer", fontSize: 14 }}>
-                      Cancel
+                      style={{ flex: 2, padding: "13px", background: feedbackText.trim() && !feedbackSending ? "#00C4BC" : "#3A3A3C", borderRadius: 12, color: "#fff", fontWeight: 700, border: "none", cursor: feedbackText.trim() && !feedbackSending ? "pointer" : "not-allowed", fontSize: 15 }}>
+                      {feedbackSending ? "Sending…" : "Send Feedback"}
                     </button>
                   </div>
                 </div>
