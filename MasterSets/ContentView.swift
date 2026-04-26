@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 import AuthenticationServices
+import StoreKit
 
 private extension String {
     /// Escapes backslashes then single quotes for safe embedding in a JS single-quoted string literal.
@@ -160,6 +161,7 @@ struct APIKeyEntryView: View {
 
 final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     weak var webView: WKWebView?
+    let tipManager = TipManager()
 
     func triggerSignIn(from webView: WKWebView) {
         self.webView = webView
@@ -191,6 +193,94 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
     }
 }
 
+// MARK: - Tip IAP
+
+private let tipProductIDs: Set<String> = [
+    "com.mastersets.app.tip_small",
+    "com.mastersets.app.tip_medium",
+    "com.mastersets.app.tip_large",
+]
+
+@MainActor
+final class TipManager {
+    weak var webView: WKWebView?
+
+    /// Fetches available products from the App Store and forwards them to JS as
+    /// window.handleTipProducts([{id, price, title}, …])
+    func fetchProducts() {
+        Task {
+            do {
+                let products = try await Product.products(for: tipProductIDs)
+                let sorted = products.sorted { $0.price < $1.price }
+                let mapped: [[String: String]] = sorted.map {
+                    ["id": $0.id, "price": $0.displayPrice, "title": $0.displayName]
+                }
+                let data = try JSONSerialization.data(withJSONObject: mapped)
+                let json = String(data: data, encoding: .utf8) ?? "[]"
+                webView?.evaluateJavaScript("window.handleTipProducts(\(json))", completionHandler: nil)
+            } catch {
+                // Products unavailable (sandbox not configured, no IAP capability yet, etc.)
+                webView?.evaluateJavaScript("window.handleTipProducts([])", completionHandler: nil)
+            }
+        }
+    }
+
+    /// Initiates a StoreKit 2 purchase for the given product ID.
+    func purchase(productID: String) {
+        Task {
+            do {
+                let products = try await Product.products(for: [productID])
+                guard let product = products.first else {
+                    send(result: ["success": false, "error": "Product not found"])
+                    return
+                }
+                let result = try await product.purchase()
+                switch result {
+                case .success(let verification):
+                    switch verification {
+                    case .verified(let transaction):
+                        await transaction.finish()
+                        send(result: ["success": true])
+                    case .unverified:
+                        send(result: ["success": false, "error": "Purchase could not be verified"])
+                    }
+                case .userCancelled:
+                    send(result: ["success": false, "cancelled": true])
+                case .pending:
+                    send(result: ["success": false, "pending": true])
+                @unknown default:
+                    send(result: ["success": false, "error": "Unknown result"])
+                }
+            } catch {
+                send(result: ["success": false, "error": error.localizedDescription])
+            }
+        }
+    }
+
+    private func send(result: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: result),
+              let json = String(data: data, encoding: .utf8) else { return }
+        webView?.evaluateJavaScript("window.handleTipResult(\(json))", completionHandler: nil)
+    }
+}
+
+/// Thin WKScriptMessageHandler wrapper — avoids the retain cycle that results
+/// from WKUserContentController strongly holding its handlers.
+private final class TipMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var manager: TipManager?
+    init(manager: TipManager) { self.manager = manager }
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "tip",
+              let body = message.body as? [String: Any],
+              let action = body["action"] as? String else { return }
+        if action == "fetchProducts" {
+            manager?.fetchProducts()
+        } else if action == "purchase", let productID = body["productID"] as? String {
+            manager?.purchase(productID: productID)
+        }
+    }
+}
+
 // MARK: - WKWebView Wrapper
 
 struct WebView: UIViewRepresentable {
@@ -210,6 +300,7 @@ struct WebView: UIViewRepresentable {
 
         // Register native message handlers
         config.userContentController.add(AppleSignInMessageHandler(coordinator: context.coordinator), name: "appleSignIn")
+        config.userContentController.add(TipMessageHandler(manager: context.coordinator.tipManager), name: "tip")
 
         // Inject API key before page loads
         let keyScript = WKUserScript(
@@ -258,6 +349,7 @@ struct WebView: UIViewRepresentable {
         #endif
 
         context.coordinator.webView = webView
+        context.coordinator.tipManager.webView = webView
         loadPage(in: webView)
         return webView
     }

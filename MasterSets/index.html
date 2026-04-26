@@ -6006,6 +6006,9 @@ function ProfileScreen({
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSending, setFeedbackSending] = useState(false);
+  const [tipProducts, setTipProducts] = useState(null); // null = not loaded, [] = unavailable
+  const [tipBusy, setTipBusy] = useState(false);
+  const [showTip, setShowTip] = useState(false);
   useEffect(() => {
     let mounted = true;
     loadSyncMeta().then(meta => {
@@ -6089,6 +6092,47 @@ function ProfileScreen({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Register native callbacks and load products when tip section is first opened.
+  function openTip() {
+    setShowTip(true);
+    if (tipProducts !== null) return; // already loaded or loading
+    window.handleTipProducts = products => {
+      setTipProducts(Array.isArray(products) ? products : []);
+      setTipBusy(false);
+    };
+    window.handleTipResult = result => {
+      setTipBusy(false);
+      if (result.cancelled || result.pending) return;
+      if (result.success) {
+        setShowTip(false);
+        setToast({
+          message: "Thank you for the tip! 🎉",
+          type: "info"
+        });
+      } else {
+        setToast({
+          message: result.error || "Purchase failed — please try again",
+          type: "error"
+        });
+      }
+    };
+    if (window.webkit?.messageHandlers?.tip) {
+      window.webkit.messageHandlers.tip.postMessage({
+        action: "fetchProducts"
+      });
+    } else {
+      setTipProducts([]); // not running in native app
+    }
+  }
+  function handleTipPurchase(productID) {
+    if (!window.webkit?.messageHandlers?.tip) return;
+    setTipBusy(true);
+    window.webkit.messageHandlers.tip.postMessage({
+      action: "purchase",
+      productID
+    });
   }
   async function handleSendFeedback() {
     // Strip URLs, HTML, and non-printable chars before sending.
@@ -6488,6 +6532,108 @@ function ProfileScreen({
       fontSize: 15
     }
   }, "Sign Out"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, showTip ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#131315",
+      borderRadius: 32,
+      padding: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#A1A1A1",
+      textTransform: "uppercase",
+      letterSpacing: "0.15em",
+      marginBottom: 4,
+      fontWeight: 700
+    }
+  }, "Send a Tip"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#6C6C6E",
+      marginBottom: 16,
+      lineHeight: 1.5
+    }
+  }, "If you're enjoying Master Sets, a tip helps keep the lights on. 100% goes to the developer."), tipProducts === null ? /*#__PURE__*/React.createElement(LoadingSpinner, {
+    label: "Loading\u2026"
+  }) : tipProducts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#6C6C6E",
+      fontSize: 13,
+      textAlign: "center",
+      padding: "8px 0"
+    }
+  }, "Tips unavailable right now \u2014 try again later.") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gap: 8
+    }
+  }, tipProducts.map(p => /*#__PURE__*/React.createElement("button", {
+    key: p.id,
+    onClick: () => !tipBusy && handleTipPurchase(p.id),
+    disabled: tipBusy,
+    style: {
+      padding: "14px 18px",
+      background: tipBusy ? "#3A3A3C" : "#1C1C1E",
+      borderRadius: 9999,
+      border: "1px solid rgba(255,255,255,0.08)",
+      cursor: tipBusy ? "not-allowed" : "pointer",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      opacity: tipBusy ? 0.6 : 1
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#FFFFFF",
+      fontWeight: 700,
+      fontSize: 15
+    }
+  }, p.title), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#00C4BC",
+      fontWeight: 800,
+      fontSize: 15
+    }
+  }, p.price)))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowTip(false),
+    style: {
+      marginTop: 14,
+      width: "100%",
+      padding: "13px",
+      background: "none",
+      border: "none",
+      color: "#6C6C6E",
+      fontWeight: 700,
+      fontSize: 14,
+      cursor: "pointer"
+    }
+  }, "Maybe Later")) : /*#__PURE__*/React.createElement("button", {
+    onClick: openTip,
+    style: {
+      width: "100%",
+      padding: "16px",
+      minHeight: 56,
+      background: "#131315",
+      borderRadius: 9999,
+      color: "#A1A1A1",
+      fontWeight: 700,
+      border: "none",
+      cursor: "pointer",
+      fontSize: 15,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(MatIcon, {
+    name: "volunteer_activism",
+    size: 20,
+    color: "#A1A1A1"
+  }), "Send a Tip")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12
     }
