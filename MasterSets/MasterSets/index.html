@@ -6022,10 +6022,11 @@ function ProfileScreen({
     };
   }, [authState]);
 
-  // Lock body scroll/position when feedback modal is open so iOS keyboard
+  // Lock body scroll/position when any modal is open so the iOS keyboard
   // cannot resize the WKWebView viewport and shift the underlying layout.
   useEffect(() => {
-    if (showFeedback) {
+    const locked = showFeedback || showTip;
+    if (locked) {
       document.body.style.position = "fixed";
       document.body.style.width = "100%";
       document.body.style.overflow = "hidden";
@@ -6039,7 +6040,7 @@ function ProfileScreen({
       document.body.style.width = "";
       document.body.style.overflow = "";
     };
-  }, [showFeedback]);
+  }, [showFeedback, showTip]);
   async function handleAppleSignIn() {
     setBusy(true);
     try {
@@ -6568,29 +6569,80 @@ function ProfileScreen({
     style: {
       marginTop: 12
     }
-  }, showTip ? /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: openTip,
     style: {
+      width: "100%",
+      padding: "16px",
+      minHeight: 56,
       background: "#131315",
-      borderRadius: 32,
-      padding: 20
+      borderRadius: 9999,
+      color: "#A1A1A1",
+      fontWeight: 700,
+      border: "none",
+      cursor: "pointer",
+      fontSize: 15,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(MatIcon, {
+    name: "volunteer_activism",
+    size: 20,
+    color: "#A1A1A1"
+  }), "Send a Tip")), showTip && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 300,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "0 20px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      setShowTip(false);
+      setCustomTipInput("");
+      setCustomTipMatch(null);
+    },
+    style: {
+      position: "absolute",
+      inset: 0,
+      background: "rgba(0,0,0,0.72)",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      zIndex: 1,
+      background: "#1C1C1E",
+      borderRadius: 20,
+      padding: "24px 20px 20px",
+      width: "100%",
+      maxWidth: 400,
+      maxHeight: "80vh",
+      overflowY: "auto",
+      WebkitOverflowScrolling: "touch",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.6)"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10,
-      color: "#A1A1A1",
-      textTransform: "uppercase",
-      letterSpacing: "0.15em",
-      marginBottom: 4,
-      fontWeight: 700
+      fontSize: 17,
+      fontWeight: 700,
+      color: "#FFFFFF",
+      marginBottom: 4
     }
   }, "Send a Tip"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
-      color: "#6C6C6E",
+      color: "#8E8E93",
       marginBottom: 16,
       lineHeight: 1.5
     }
-  }, "Enjoying Master Sets? A tip helps keep it going. 100% goes to the developer."), tipProducts === null ? /*#__PURE__*/React.createElement(LoadingSpinner, {
+  }, "Enjoying Master Sets? A tip helps keep it going \u2014 100% goes to the developer."), tipProducts === null ? /*#__PURE__*/React.createElement(LoadingSpinner, {
     label: "Loading\u2026"
   }) : tipProducts.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6611,8 +6663,8 @@ function ProfileScreen({
     disabled: tipBusy,
     style: {
       padding: "14px 18px",
-      background: tipBusy ? "#3A3A3C" : "#1C1C1E",
-      borderRadius: 9999,
+      background: tipBusy ? "#3A3A3C" : "#2C2C2E",
+      borderRadius: 12,
       border: "1px solid rgba(255,255,255,0.08)",
       cursor: tipBusy ? "not-allowed" : "pointer",
       display: "flex",
@@ -6626,7 +6678,7 @@ function ProfileScreen({
       fontWeight: 700,
       fontSize: 15
     }
-  }, p.title), /*#__PURE__*/React.createElement("span", {
+  }, p.name), /*#__PURE__*/React.createElement("span", {
     style: {
       color: "#00C4BC",
       fontWeight: 800,
@@ -6637,7 +6689,7 @@ function ProfileScreen({
       display: "flex",
       alignItems: "center",
       gap: 10,
-      marginBottom: 14
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6652,7 +6704,7 @@ function ProfileScreen({
       fontWeight: 700,
       letterSpacing: "0.08em"
     }
-  }, "OR CUSTOM AMOUNT"), /*#__PURE__*/React.createElement("div", {
+  }, "CUSTOM AMOUNT"), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       height: 1,
@@ -6662,7 +6714,8 @@ function ProfileScreen({
     style: {
       display: "flex",
       gap: 8,
-      alignItems: "center"
+      alignItems: "center",
+      marginBottom: 6
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6694,12 +6747,13 @@ function ProfileScreen({
     style: {
       width: "100%",
       padding: "13px 14px 13px 28px",
-      background: "#1C1C1E",
+      background: "#2C2C2E",
       border: "1px solid rgba(255,255,255,0.08)",
-      borderRadius: 9999,
+      borderRadius: 12,
       color: "#FFFFFF",
       fontSize: 16,
-      outline: "none"
+      outline: "none",
+      boxSizing: "border-box"
     }
   })), /*#__PURE__*/React.createElement("button", {
     onClick: () => customTipMatch && !tipBusy && handleTipPurchase(customTipMatch.id),
@@ -6707,7 +6761,7 @@ function ProfileScreen({
     style: {
       padding: "13px 20px",
       background: customTipMatch && !tipBusy ? "#00C4BC" : "#3A3A3C",
-      borderRadius: 9999,
+      borderRadius: 12,
       border: "none",
       color: "#fff",
       fontWeight: 800,
@@ -6719,10 +6773,10 @@ function ProfileScreen({
     style: {
       fontSize: 11,
       color: "#6C6C6E",
-      marginTop: 6,
+      marginBottom: 14,
       textAlign: "center"
     }
-  }, "Nearest available: ", /*#__PURE__*/React.createElement("span", {
+  }, "Nearest: ", /*#__PURE__*/React.createElement("span", {
     style: {
       color: "#00C4BC",
       fontWeight: 700
@@ -6732,7 +6786,7 @@ function ProfileScreen({
       display: "flex",
       alignItems: "center",
       gap: 10,
-      margin: "18px 0 14px"
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6747,7 +6801,7 @@ function ProfileScreen({
       fontWeight: 700,
       letterSpacing: "0.08em"
     }
-  }, "OR SUPPORT EXTERNALLY"), /*#__PURE__*/React.createElement("div", {
+  }, "SUPPORT EXTERNALLY"), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       height: 1,
@@ -6757,14 +6811,15 @@ function ProfileScreen({
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
-      gap: 8
+      gap: 8,
+      marginBottom: 14
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => window.webkit?.messageHandlers?.openTipPage?.postMessage("kofi"),
     style: {
       padding: "13px 10px",
-      background: "#1C1C1E",
-      borderRadius: 9999,
+      background: "#2C2C2E",
+      borderRadius: 12,
       border: "1px solid rgba(255,255,255,0.08)",
       cursor: "pointer",
       display: "flex",
@@ -6786,8 +6841,8 @@ function ProfileScreen({
     onClick: () => window.webkit?.messageHandlers?.openTipPage?.postMessage("paypal"),
     style: {
       padding: "13px 10px",
-      background: "#1C1C1E",
-      borderRadius: 9999,
+      background: "#2C2C2E",
+      borderRadius: 12,
       border: "1px solid rgba(255,255,255,0.08)",
       cursor: "pointer",
       display: "flex",
@@ -6812,39 +6867,17 @@ function ProfileScreen({
       setCustomTipMatch(null);
     },
     style: {
-      marginTop: 14,
       width: "100%",
       padding: "13px",
-      background: "none",
+      background: "#3A3A3C",
+      borderRadius: 12,
       border: "none",
-      color: "#6C6C6E",
-      fontWeight: 700,
-      fontSize: 14,
+      color: "#A1A1A1",
+      fontWeight: 600,
+      fontSize: 15,
       cursor: "pointer"
     }
-  }, "Maybe Later")) : /*#__PURE__*/React.createElement("button", {
-    onClick: openTip,
-    style: {
-      width: "100%",
-      padding: "16px",
-      minHeight: 56,
-      background: "#131315",
-      borderRadius: 9999,
-      color: "#A1A1A1",
-      fontWeight: 700,
-      border: "none",
-      cursor: "pointer",
-      fontSize: 15,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement(MatIcon, {
-    name: "volunteer_activism",
-    size: 20,
-    color: "#A1A1A1"
-  }), "Send a Tip")), /*#__PURE__*/React.createElement("div", {
+  }, "Maybe Later"))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12
     }

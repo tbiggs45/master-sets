@@ -1,6 +1,8 @@
 import SwiftUI
 import WebKit
 import AuthenticationServices
+import StoreKit
+import SafariServices
 
 // MARK: - Supabase Constants (not user-configurable)
 
@@ -154,6 +156,7 @@ struct APIKeyEntryView: View {
 // MARK: - Apple Sign-In Bridge
 
 final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding, WKUIDelegate {
+    let tipManager = TipManager()
 
     // Auto-grant camera/microphone access so WKWebView doesn't re-prompt every launch.
     // The OS-level AVCaptureDevice permission dialog (shown once at install) is the real gate.
@@ -202,6 +205,137 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
     }
 }
 
+// MARK: - In-App Tip (StoreKit 2)
+
+final class TipManager {
+    static let productIDs: [String] = [
+        "tip_small",  // $0.99
+        "tip_2",      // $1.99
+        "tip_3",      // $2.99
+        "tip_medium", // $4.99
+        "tip_large",  // $9.99
+        "tip_15",     // $14.99
+        "tip_20",     // $19.99
+        "tip_50"      // $49.99
+    ]
+    weak var webView: WKWebView?
+
+    func fetchProducts() {
+        Task {
+            do {
+                let products = try await Product.products(for: TipManager.productIDs)
+                let sorted = products.sorted { $0.price < $1.price }
+                let arr: [[String: String]] = sorted.map {
+                    ["id": $0.id, "name": $0.displayName, "price": $0.displayPrice]
+                }
+                let data = try JSONSerialization.data(withJSONObject: arr)
+                let json = String(data: data, encoding: .utf8) ?? "[]"
+                await MainActor.run { [weak self] in
+                    self?.webView?.evaluateJavaScript("window.handleTipProducts(\(json))", completionHandler: nil)
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.webView?.evaluateJavaScript("window.handleTipProducts([])", completionHandler: nil)
+                }
+            }
+        }
+    }
+
+    func purchase(productID: String) {
+        Task {
+            do {
+                let products = try await Product.products(for: [productID])
+                guard let product = products.first else {
+                    sendResult(["success": false, "error": "Product not found"])
+                    return
+                }
+                let result = try await product.purchase()
+                switch result {
+                case .success(let verification):
+                    switch verification {
+                    case .verified(let transaction):
+                        await transaction.finish()
+                        sendResult(["success": true])
+                    case .unverified:
+                        sendResult(["success": false, "error": "Purchase could not be verified"])
+                    }
+                case .userCancelled:
+                    sendResult(["cancelled": true])
+                case .pending:
+                    sendResult(["pending": true])
+                @unknown default:
+                    sendResult(["success": false, "error": "Unknown purchase state"])
+                }
+            } catch {
+                sendResult(["success": false, "error": error.localizedDescription])
+            }
+        }
+    }
+
+    private func sendResult(_ payload: [String: Any]) {
+        guard
+            let data = try? JSONSerialization.data(withJSONObject: payload),
+            let json = String(data: data, encoding: .utf8)
+        else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.webView?.evaluateJavaScript("window.handleTipResult(\(json))", completionHandler: nil)
+        }
+    }
+}
+
+private final class TipMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var manager: TipManager?
+
+    init(manager: TipManager) {
+        self.manager = manager
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "tip",
+              let body = message.body as? [String: Any],
+              let action = body["action"] as? String
+        else { return }
+        switch action {
+        case "fetchProducts":
+            manager?.fetchProducts()
+        case "purchase":
+            guard let productID = body["productID"] as? String else { return }
+            manager?.purchase(productID: productID)
+        default:
+            break
+        }
+    }
+}
+
+// MARK: - External Tip (Ko-fi / PayPal via SFSafariViewController)
+
+private enum ExternalTip {
+    // swiftlint:disable force_unwrapping
+    static let kofi   = URL(string: "https://ko-fi.com/big_hams")!
+    static let paypal = URL(string: "https://paypal.me/tsbigham")!
+    // swiftlint:enable force_unwrapping
+}
+
+private final class ExternalTipMessageHandler: NSObject, WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "openTipPage", let platform = message.body as? String else { return }
+        let url: URL
+        switch platform {
+        case "kofi":   url = ExternalTip.kofi
+        case "paypal": url = ExternalTip.paypal
+        default: return
+        }
+        DispatchQueue.main.async {
+            guard let rootVC = UIApplication.shared.connectedScenes
+                .compactMap({ ($0 as? UIWindowScene)?.keyWindow?.rootViewController })
+                .first else { return }
+            let safari = SFSafariViewController(url: url)
+            safari.preferredControlTintColor = UIColor(red: 0, green: 0.769, blue: 0.737, alpha: 1)
+            rootVC.present(safari, animated: true)
+        }
+    }
+}
+
 // MARK: - WKWebView Wrapper
 
 struct WebView: UIViewRepresentable {
@@ -221,6 +355,8 @@ struct WebView: UIViewRepresentable {
 
         // Register native message handlers
         config.userContentController.add(AppleSignInMessageHandler(coordinator: context.coordinator), name: "appleSignIn")
+        config.userContentController.add(TipMessageHandler(manager: context.coordinator.tipManager), name: "tip")
+        config.userContentController.add(ExternalTipMessageHandler(), name: "openTipPage")
 
         // Inject API key before page loads
         let keyScript = WKUserScript(
@@ -269,6 +405,7 @@ struct WebView: UIViewRepresentable {
         #endif
 
         context.coordinator.webView = webView
+        context.coordinator.tipManager.webView = webView
         webView.uiDelegate = context.coordinator
         loadPage(in: webView)
         return webView
