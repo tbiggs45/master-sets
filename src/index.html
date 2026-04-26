@@ -2749,6 +2749,8 @@
       const [tipProducts, setTipProducts] = useState(null); // null = not loaded, [] = unavailable
       const [tipBusy, setTipBusy] = useState(false);
       const [showTip, setShowTip] = useState(false);
+      const [customTipInput, setCustomTipInput] = useState("");
+      const [customTipMatch, setCustomTipMatch] = useState(null); // nearest product to typed amount
 
       useEffect(() => {
         let mounted = true;
@@ -2820,6 +2822,17 @@
         if (!window.webkit?.messageHandlers?.tip) return;
         setTipBusy(true);
         window.webkit.messageHandlers.tip.postMessage({ action: "purchase", productID });
+      }
+
+      // Parse the custom input and find the nearest available product by price.
+      function resolveCustomTip(input, products) {
+        const val = parseFloat(input.replace(/[^0-9.]/g, ""));
+        if (!val || !products?.length) return null;
+        return products.reduce((best, p) => {
+          const pPrice = parseFloat(p.price.replace(/[^0-9.]/g, "")) || 0;
+          const bPrice = parseFloat(best.price.replace(/[^0-9.]/g, "")) || 0;
+          return Math.abs(pPrice - val) < Math.abs(bPrice - val) ? p : best;
+        });
       }
 
       async function handleSendFeedback() {
@@ -2952,23 +2965,63 @@
               {showTip ? (
                 <div style={{ background: "#131315", borderRadius: 32, padding: 20 }}>
                   <div style={{ fontSize: 10, color: "#A1A1A1", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4, fontWeight: 700 }}>Send a Tip</div>
-                  <div style={{ fontSize: 13, color: "#6C6C6E", marginBottom: 16, lineHeight: 1.5 }}>If you're enjoying Master Sets, a tip helps keep the lights on. 100% goes to the developer.</div>
+                  <div style={{ fontSize: 13, color: "#6C6C6E", marginBottom: 16, lineHeight: 1.5 }}>Enjoying Master Sets? A tip helps keep it going. 100% goes to the developer.</div>
                   {tipProducts === null ? (
                     <LoadingSpinner label="Loading…" />
                   ) : tipProducts.length === 0 ? (
                     <div style={{ color: "#6C6C6E", fontSize: 13, textAlign: "center", padding: "8px 0" }}>Tips unavailable right now — try again later.</div>
                   ) : (
-                    <div style={{ display: "grid", gap: 8 }}>
-                      {tipProducts.map(p => (
-                        <button key={p.id} onClick={() => !tipBusy && handleTipPurchase(p.id)} disabled={tipBusy}
-                          style={{ padding: "14px 18px", background: tipBusy ? "#3A3A3C" : "#1C1C1E", borderRadius: 9999, border: "1px solid rgba(255,255,255,0.08)", cursor: tipBusy ? "not-allowed" : "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: tipBusy ? 0.6 : 1 }}>
-                          <span style={{ color: "#FFFFFF", fontWeight: 700, fontSize: 15 }}>{p.title}</span>
-                          <span style={{ color: "#00C4BC", fontWeight: 800, fontSize: 15 }}>{p.price}</span>
+                    <>
+                      {/* Preset tiers */}
+                      <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+                        {tipProducts.map(p => (
+                          <button key={p.id} onClick={() => !tipBusy && handleTipPurchase(p.id)} disabled={tipBusy}
+                            style={{ padding: "14px 18px", background: tipBusy ? "#3A3A3C" : "#1C1C1E", borderRadius: 9999, border: "1px solid rgba(255,255,255,0.08)", cursor: tipBusy ? "not-allowed" : "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: tipBusy ? 0.6 : 1 }}>
+                            <span style={{ color: "#FFFFFF", fontWeight: 700, fontSize: 15 }}>{p.title}</span>
+                            <span style={{ color: "#00C4BC", fontWeight: 800, fontSize: 15 }}>{p.price}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Divider */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                        <div style={{ flex: 1, height: 1, background: "#3A3A3C" }} />
+                        <span style={{ fontSize: 11, color: "#6C6C6E", fontWeight: 700, letterSpacing: "0.08em" }}>OR CUSTOM AMOUNT</span>
+                        <div style={{ flex: 1, height: 1, background: "#3A3A3C" }} />
+                      </div>
+
+                      {/* Custom amount input */}
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <div style={{ position: "relative", flex: 1 }}>
+                          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#A1A1A1", fontWeight: 700, fontSize: 16, pointerEvents: "none" }}>$</span>
+                          <input
+                            type="number" min="0.99" step="0.01"
+                            placeholder="0.00"
+                            value={customTipInput}
+                            onChange={e => {
+                              const v = e.target.value;
+                              setCustomTipInput(v);
+                              setCustomTipMatch(resolveCustomTip(v, tipProducts));
+                            }}
+                            style={{ width: "100%", padding: "13px 14px 13px 28px", background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9999, color: "#FFFFFF", fontSize: 16, outline: "none" }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => customTipMatch && !tipBusy && handleTipPurchase(customTipMatch.id)}
+                          disabled={!customTipMatch || tipBusy}
+                          style={{ padding: "13px 20px", background: customTipMatch && !tipBusy ? "#00C4BC" : "#3A3A3C", borderRadius: 9999, border: "none", color: "#fff", fontWeight: 800, fontSize: 14, cursor: customTipMatch && !tipBusy ? "pointer" : "not-allowed", flexShrink: 0 }}>
+                          {tipBusy ? "…" : "Send"}
                         </button>
-                      ))}
-                    </div>
+                      </div>
+                      {customTipMatch && customTipInput && (
+                        <div style={{ fontSize: 11, color: "#6C6C6E", marginTop: 6, textAlign: "center" }}>
+                          Nearest available: <span style={{ color: "#00C4BC", fontWeight: 700 }}>{customTipMatch.price}</span>
+                        </div>
+                      )}
+                    </>
                   )}
-                  <button onClick={() => setShowTip(false)} style={{ marginTop: 14, width: "100%", padding: "13px", background: "none", border: "none", color: "#6C6C6E", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                  <button onClick={() => { setShowTip(false); setCustomTipInput(""); setCustomTipMatch(null); }}
+                    style={{ marginTop: 14, width: "100%", padding: "13px", background: "none", border: "none", color: "#6C6C6E", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
                     Maybe Later
                   </button>
                 </div>

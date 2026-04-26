@@ -196,9 +196,14 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
 // MARK: - Tip IAP
 
 private let tipProductIDs: Set<String> = [
-    "com.mastersets.app.tip_small",
-    "com.mastersets.app.tip_medium",
-    "com.mastersets.app.tip_large",
+    "com.mastersets.app.tip_small",    // $0.99
+    "com.mastersets.app.tip_medium",   // $4.99
+    "com.mastersets.app.tip_large",    // $9.99
+    "com.mastersets.app.tip_2",        // $1.99
+    "com.mastersets.app.tip_3",        // $2.99
+    "com.mastersets.app.tip_15",       // $14.99
+    "com.mastersets.app.tip_20",       // $19.99
+    "com.mastersets.app.tip_50",       // $49.99
 ]
 
 @MainActor

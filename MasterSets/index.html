@@ -6009,6 +6009,9 @@ function ProfileScreen({
   const [tipProducts, setTipProducts] = useState(null); // null = not loaded, [] = unavailable
   const [tipBusy, setTipBusy] = useState(false);
   const [showTip, setShowTip] = useState(false);
+  const [customTipInput, setCustomTipInput] = useState("");
+  const [customTipMatch, setCustomTipMatch] = useState(null); // nearest product to typed amount
+
   useEffect(() => {
     let mounted = true;
     loadSyncMeta().then(meta => {
@@ -6132,6 +6135,17 @@ function ProfileScreen({
     window.webkit.messageHandlers.tip.postMessage({
       action: "purchase",
       productID
+    });
+  }
+
+  // Parse the custom input and find the nearest available product by price.
+  function resolveCustomTip(input, products) {
+    const val = parseFloat(input.replace(/[^0-9.]/g, ""));
+    if (!val || !products?.length) return null;
+    return products.reduce((best, p) => {
+      const pPrice = parseFloat(p.price.replace(/[^0-9.]/g, "")) || 0;
+      const bPrice = parseFloat(best.price.replace(/[^0-9.]/g, "")) || 0;
+      return Math.abs(pPrice - val) < Math.abs(bPrice - val) ? p : best;
     });
   }
   async function handleSendFeedback() {
@@ -6557,7 +6571,7 @@ function ProfileScreen({
       marginBottom: 16,
       lineHeight: 1.5
     }
-  }, "If you're enjoying Master Sets, a tip helps keep the lights on. 100% goes to the developer."), tipProducts === null ? /*#__PURE__*/React.createElement(LoadingSpinner, {
+  }, "Enjoying Master Sets? A tip helps keep it going. 100% goes to the developer."), tipProducts === null ? /*#__PURE__*/React.createElement(LoadingSpinner, {
     label: "Loading\u2026"
   }) : tipProducts.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6566,10 +6580,11 @@ function ProfileScreen({
       textAlign: "center",
       padding: "8px 0"
     }
-  }, "Tips unavailable right now \u2014 try again later.") : /*#__PURE__*/React.createElement("div", {
+  }, "Tips unavailable right now \u2014 try again later.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
-      gap: 8
+      gap: 8,
+      marginBottom: 14
     }
   }, tipProducts.map(p => /*#__PURE__*/React.createElement("button", {
     key: p.id,
@@ -6598,8 +6613,107 @@ function ProfileScreen({
       fontWeight: 800,
       fontSize: 15
     }
-  }, p.price)))), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowTip(false),
+  }, p.price)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      height: 1,
+      background: "#3A3A3C"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#6C6C6E",
+      fontWeight: 700,
+      letterSpacing: "0.08em"
+    }
+  }, "OR CUSTOM AMOUNT"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      height: 1,
+      background: "#3A3A3C"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "absolute",
+      left: 14,
+      top: "50%",
+      transform: "translateY(-50%)",
+      color: "#A1A1A1",
+      fontWeight: 700,
+      fontSize: 16,
+      pointerEvents: "none"
+    }
+  }, "$"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0.99",
+    step: "0.01",
+    placeholder: "0.00",
+    value: customTipInput,
+    onChange: e => {
+      const v = e.target.value;
+      setCustomTipInput(v);
+      setCustomTipMatch(resolveCustomTip(v, tipProducts));
+    },
+    style: {
+      width: "100%",
+      padding: "13px 14px 13px 28px",
+      background: "#1C1C1E",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: 9999,
+      color: "#FFFFFF",
+      fontSize: 16,
+      outline: "none"
+    }
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => customTipMatch && !tipBusy && handleTipPurchase(customTipMatch.id),
+    disabled: !customTipMatch || tipBusy,
+    style: {
+      padding: "13px 20px",
+      background: customTipMatch && !tipBusy ? "#00C4BC" : "#3A3A3C",
+      borderRadius: 9999,
+      border: "none",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 14,
+      cursor: customTipMatch && !tipBusy ? "pointer" : "not-allowed",
+      flexShrink: 0
+    }
+  }, tipBusy ? "…" : "Send")), customTipMatch && customTipInput && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6C6C6E",
+      marginTop: 6,
+      textAlign: "center"
+    }
+  }, "Nearest available: ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#00C4BC",
+      fontWeight: 700
+    }
+  }, customTipMatch.price))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setShowTip(false);
+      setCustomTipInput("");
+      setCustomTipMatch(null);
+    },
     style: {
       marginTop: 14,
       width: "100%",
