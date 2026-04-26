@@ -22,9 +22,6 @@ private enum Supabase {
 // Users will never need to enter an API key — scanning just works.
 
 private enum ScanBackend {
-    // TODO: Replace with your deployed Render/Railway/Fly URL after deployment.
-    // Example: "https://master-sets-scan.onrender.com"
-    // Leave empty ("") during local development and use the settings UI to set a dev URL.
     static let defaultEndpoint = "https://master-sets.onrender.com"
 }
 
@@ -299,10 +296,15 @@ struct ContentView: View {
         let saved = UserDefaults.standard.string(forKey: "scan_backend_url") ?? ""
         return saved.isEmpty ? ScanBackend.defaultEndpoint : saved
     }()
+    @State private var showSettings = false
 
     var body: some View {
         WebView(apiKey: apiKey, backendURL: backendURL)
             .ignoresSafeArea()
             .preferredColorScheme(.dark)
+            .onLongPressGesture(minimumDuration: 3) { showSettings = true }
+            .sheet(isPresented: $showSettings) {
+                APIKeyEntryView(apiKey: $apiKey, backendURL: $backendURL)
+            }
     }
 }

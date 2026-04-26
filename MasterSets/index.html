@@ -980,7 +980,7 @@ async function identifyCardWithVision(base64, stripBase64 = null) {
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 200,
-      system: `You are a Pokémon TCG card identification assistant. Analyze the card carefully and return ONLY a JSON object with no preamble or markdown backticks.\n\nThe image has been tightly cropped to the card face. When a second image is provided, it is a zoomed view of the bottom strip of the same card — prioritize it for reading the card number, set symbol, and copyright text.\n\nTo identify the SET accurately:\n- The card number at the bottom (e.g. "025/191") — the TOTAL (191) is highly specific to a set\n- The small set symbol icon at the bottom right near the number\n- The copyright/trademark text at the very bottom edge\n- Recent English sets by card total: Journey Together (190), Prismatic Evolutions (131), Surging Sparks (191), Stellar Crown (142), Shrouded Fable (99), Twilight Masquerade (167), Temporal Forces (162), Paldean Fates (91), Paradox Rift (182), Obsidian Flames (197), Pokemon 151 (165), Paldea Evolved (193), Scarlet & Violet Base (258).\n\nReturn this exact structure:\n{\n  "name": "card name as printed",\n  "setName": "official set name",\n  "number": "card number as printed (e.g. 025/191)",\n  "rarity": "rarity as printed or inferred from symbol",\n  "confidence": "high|medium|low",\n  "notes": "any issues or observations"\n}\n\nIf blurry or not a Pokémon card, set confidence to low and explain in notes.`,
+      system: `You are a Pokémon TCG card identification assistant. This tool supports English-language cards only. Analyze the card carefully and return ONLY a JSON object with no preamble or markdown backticks.\n\nThe image has been tightly cropped to the card face. When a second image is provided, it is a zoomed view of the bottom strip of the same card — prioritize it for reading the card number, set symbol, and copyright text.\n\nTo identify the SET accurately:\n- The card number at the bottom (e.g. "025/191") — the TOTAL (191) is highly specific to a set\n- The small set symbol icon at the bottom right near the number\n- The copyright/trademark text at the very bottom edge\n- Recent English sets by card total: Journey Together (190), Prismatic Evolutions (131), Surging Sparks (191), Stellar Crown (142), Shrouded Fable (99), Twilight Masquerade (167), Temporal Forces (162), Paldean Fates (91), Paradox Rift (182), Obsidian Flames (197), Pokemon 151 (165), Paldea Evolved (193), Scarlet & Violet Base (258).\n\nReturn this exact structure:\n{\n  "name": "card name as printed",\n  "setName": "official set name",\n  "number": "card number as printed (e.g. 025/191)",\n  "rarity": "rarity as printed or inferred from symbol",\n  "confidence": "high|medium|low",\n  "notes": "any issues or observations"\n}\n\nIf the card text is not in English, set confidence to low and begin notes with "non-English card". If blurry or not a Pokémon card, set confidence to low and explain in notes.`,
       messages: [{
         role: "user",
         content: [{
@@ -2113,6 +2113,11 @@ function ScanScreen({
     }, 30000);
     try {
       const visionResult = await identifyCardWithVision(base64, stripBase64);
+      // Reject non-English cards (non-Latin script in name/set, or AI flagged it).
+      const _nonLatinRe = /[぀-ゟ゠-ヿ가-힯ᄀ-ᇿ一-鿿㐀-䶿฀-๿]/;
+      if (_nonLatinRe.test((visionResult.name || "") + (visionResult.setName || "")) || (visionResult.notes || "").toLowerCase().startsWith("non-english card")) {
+        throw new Error("FOREIGN_CARD");
+      }
       // Kick off the TCG card lookup immediately in parallel with navigation so
       // ConfirmScreen can await this in-flight promise instead of starting from scratch.
       const cardFetchPromise = (visionResult?.name || "").trim() ? searchCardsByName(visionResult.name).catch(() => null) : null;
@@ -2123,7 +2128,7 @@ function ScanScreen({
       });
     } catch (e) {
       if (!mountedRef.current) return;
-      const msg = e.message.includes("NO_SCAN_BACKEND") ? "Card scanning is coming soon — stay tuned!" : e.message.includes("RATE_LIMITED") ? "Too many scans — try again in a moment" : e.message.includes("TIMEOUT") ? "Analysis timed out — please try again" : e.message.includes("401") || e.message.includes("403") ? "Scan service unavailable — try again later" : "Couldn't identify card — try better lighting or a clearer angle";
+      const msg = e.message.includes("NO_SCAN_BACKEND") ? "Card scanning is coming soon — stay tuned!" : e.message.includes("RATE_LIMITED") ? "Too many scans — try again in a moment" : e.message.includes("TIMEOUT") ? "Analysis timed out — please try again" : e.message.includes("FOREIGN_CARD") ? "Foreign cards aren't supported yet — English cards only" : e.message.includes("401") || e.message.includes("403") ? "Scan service unavailable — try again later" : "Couldn't identify card — try better lighting or a clearer angle";
       setIdentifyError(msg);
       showToast(msg, "error");
       setCapturedFrame(null);
@@ -2220,7 +2225,7 @@ function ScanScreen({
     name: "arrow_back",
     size: 18,
     color: "#fff"
-  })), /*#__PURE__*/React.createElement("span", {
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 18,
       fontWeight: 900,
@@ -2228,7 +2233,14 @@ function ScanScreen({
       letterSpacing: "-0.02em",
       textTransform: "uppercase"
     }
-  }, "Scan Card")), /*#__PURE__*/React.createElement("div", {
+  }, "Scan Card"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "rgba(255,255,255,0.45)",
+      fontWeight: 600,
+      letterSpacing: "0.04em"
+    }
+  }, "English cards only"))), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       display: "flex",
