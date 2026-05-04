@@ -6978,7 +6978,27 @@ function ProfileScreen({
       cursor: feedbackText.trim() && !feedbackSending ? "pointer" : "not-allowed",
       fontSize: 15
     }
-  }, feedbackSending ? "Sending…" : "Send Feedback")))), !configured && /*#__PURE__*/React.createElement("div", {
+  }, feedbackSending ? "Sending…" : "Send Feedback")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 28,
+      padding: "0 4px 8px",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "#48484A",
+      fontSize: 11,
+      lineHeight: 1.6,
+      margin: "0 0 8px 0"
+    }
+  }, "Master Sets is an independent, unofficial app. Not affiliated with, endorsed by, or sponsored by The Pokémon Company International, Nintendo, or Game Freak. Pokémon and all related names are trademarks of Nintendo / Creatures Inc. / GAME FREAK inc."), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "#48484A",
+      fontSize: 11,
+      lineHeight: 1.6,
+      margin: 0
+    }
+  }, "Card data and images provided by the Pokémon TCG API (pokemontcg.io). Market prices via TCGPlayer & Cardmarket.")), !configured && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 16,
       background: "#131315",
@@ -8486,7 +8506,15 @@ function DashboardScreen({
         color: "#3A3A3C"
       })));
     }));
-  })()))), selectedSavedCard && (() => {
+  })()))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "4px 20px 8px",
+      color: "#2C2C2E",
+      fontSize: 10,
+      lineHeight: 1.5
+    }
+  }, "Not an official Pokémon product. Card data via pokemontcg.io."), selectedSavedCard && (() => {
     const scName = enrichedCards[selectedSavedCard.id]?.name || selectedSavedCard.name;
     const scRarity = enrichedCards[selectedSavedCard.id]?.rarity || selectedSavedCard.rarity;
     return /*#__PURE__*/React.createElement("div", {
